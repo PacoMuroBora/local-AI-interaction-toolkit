@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+
+# Env / secrets
+.env
+.env.local
+*.pem
+
+# Runtime outputs
+runtime/output/*
+!runtime/output/.gitkeep
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Models / caches
+models/
+*.onnx
+*.pt
+.cache/
+huggingface/
