@@ -1,0 +1,20 @@
+---
+description: TouchDesigner OSC addresses, types, and mic gating
+alwaysApply: true
+---
+
+# TouchDesigner OSC + gating
+
+OSC must match TouchDesigner `OSC In DAT` exactly:
+
+| Address | Type | Values |
+|---------|------|--------|
+| `/luzifer/state` | string | `listening`, `thinking`, `speaking` |
+| `/luzifer/user_text` | string | visitor transcript |
+| `/luzifer/ai_text` | string | LLM reply |
+| `/luzifer/play` | int | `1` after `speech.wav` is written |
+
+- WAV path: `runtime/output/speech.wav` (reload on `/luzifer/play`).
+- Mic / VAD stream MUST stop whenever `state != "listening"` (covers `thinking` and `speaking` anti-feedback).
+- Do not invent new `/luzifer/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
+- Send OSC via `TouchDesignerOscClient` (`asyncio.to_thread` + lock); no raw socket one-offs in the pipeline.

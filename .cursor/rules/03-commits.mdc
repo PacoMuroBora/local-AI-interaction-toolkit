@@ -1,0 +1,13 @@
+---
+description: Commit finished feature slices on the current branch
+alwaysApply: true
+---
+
+# Commit cadence
+
+- After a coherent feature slice works, commit on the **current branch**. Do not create feature branches unless asked.
+- One commit = one coherent change (engine, dashboard behavior, pipeline gating, related docs).
+- Too small: per-file, typo-only, or WIP saves. Too large: unrelated features dumped together.
+- Never commit `.env`, credentials, `.venv`, or `runtime/output/*.wav`.
+- Message: 1–2 sentences on **why**. No `--amend`, force push, or `--no-verify` unless the user explicitly asks.
+- During scaffold/multi-step work, land medium commits as slices finish; do not wait for the entire task.

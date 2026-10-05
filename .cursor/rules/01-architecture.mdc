@@ -1,0 +1,13 @@
+---
+description: Luzifer async architecture, logging, and swappable engines
+alwaysApply: true
+---
+
+# Luzifer architecture
+
+- Use `async`/`await` for I/O: Ollama HTTP, OSC sends, dashboard websockets, pipeline awaits.
+- Offload blocking audio/model work with `asyncio.to_thread`; do not block the event loop.
+- Log with `loguru` (`logger.info` / `warning` / `error`); no `print` for diagnostics.
+- Keep engines behind small classes/protocols (`WhisperEngine`, `TtsEngine`, …) so STT/TTS backends swap without rewriting `pipeline.py`.
+- Read live settings from `ConfigStore` each turn; never hardcode persona, model, or VAD thresholds in Python.
+- Prefer editing `config.yaml` / dashboard over adding new env-only knobs unless they are deploy secrets.
