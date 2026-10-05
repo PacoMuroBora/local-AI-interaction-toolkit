@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 from loguru import logger
 
 from luzifer.config import LlmSettings
+
+ChatMessage = dict[str, str]
 
 
 class OllamaEngine:
@@ -28,15 +32,22 @@ class OllamaEngine:
             await self._client.aclose()
             self._client = None
 
-    async def chat(self, user_text: str, system_prompt: str, settings: LlmSettings) -> str:
+    async def chat(
+        self,
+        user_text: str,
+        system_prompt: str,
+        settings: LlmSettings,
+        history: list[ChatMessage] | None = None,
+    ) -> str:
         client = await self._get_client(settings.base_url)
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": user_text})
         payload = {
             "model": settings.model,
             "stream": False,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
-            ],
+            "messages": messages,
             "options": {
                 "temperature": settings.temperature,
                 "top_p": settings.top_p,

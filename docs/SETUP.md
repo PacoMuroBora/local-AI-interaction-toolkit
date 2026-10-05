@@ -6,7 +6,7 @@
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
 - [Ollama](https://ollama.com/) with a chat model pulled (default `llama3.2`)
-- TouchDesigner with OSC In on port `9000`
+- TouchDesigner with OSC In on port `9000` and OSC Out to port `9001`
 
 ## Install
 
@@ -31,7 +31,7 @@ cp .env.example .env
 
 ## Run
 
-Single process (pipeline + dashboard):
+Single process (pipeline + dashboard + inbound OSC):
 
 ```bash
 uv run luzifer
@@ -40,10 +40,23 @@ uv run python -m luzifer.main
 ```
 
 - Dashboard: http://127.0.0.1:8501  
-- OSC out: `127.0.0.1:9000`  
+- OSC out (→ TD): `127.0.0.1:9000`  
+- OSC in (← TD): `127.0.0.1:9001`  
 - WAV: `runtime/output/speech.wav`
 
 Without Whisper/Silero/Kokoro installed, mock engines still run (mock transcript + beep wav) so OSC and TD wiring can be tested.
+
+## Dashboard
+
+Header tabs:
+
+- **Audio In** — mic, VAD, Whisper size + download cache status  
+- **Audio Out** — TTS engine/voice, local monitor, Kokoro/Piper asset downloads  
+- **Prompt / LLM** — system prompt, sampling, history turns, Ollama model list + pull  
+
+Footer: live transcript, manual test text (**Send → LLM+TTS** / **Speak only**), **Interrupt**, **Reset session**.
+
+OSC host/ports are editable in the header strip and saved with config.
 
 ## Models
 
@@ -53,11 +66,11 @@ Without Whisper/Silero/Kokoro installed, mock engines still run (mock transcript
 ollama pull llama3.2
 ```
 
-Change model / temperature in the dashboard or `config.yaml`.
+Or use the dashboard Prompt / LLM tab (list + Pull). Change temperature / history in the dashboard or `config.yaml` (`llm.history_turns`).
 
 ### Whisper (`--extra stt`)
 
-`faster-whisper` downloads the configured `stt.model_size` on first use.
+`faster-whisper` downloads the configured `stt.model_size` on first use, or via the Audio In tab Download buttons.
 
 ### Silero VAD (`--extra vad`)
 
@@ -65,20 +78,21 @@ Loaded via `torch.hub` (`snakers4/silero-vad`) on first capture.
 
 ### Kokoro / Piper (`--extra tts`)
 
-Place ONNX assets under `models/` (gitignored), e.g.:
+Download from the Audio Out tab into `models/` (gitignored), or place manually:
 
 - Kokoro: `models/kokoro-v1.0.onnx`, `models/voices-v1.0.bin`
-- Piper: `models/<voice>.onnx` (+ `.json` as required by Piper)
+- Piper: `models/<voice>.onnx` (+ `.onnx.json`)
 
-`tts.engine` in config selects `kokoro` or `piper`. Missing models write a short beep wav so TD still gets a file.
+`tts.engine` selects `kokoro` or `piper`. Missing models write a short beep wav so TD still gets a file.
 
 ## TouchDesigner
 
-1. **OSC In DAT** — network port `9000`, parse `/luzifer/*` (see [OSC_SPEC.md](OSC_SPEC.md)).
-2. **Audio File In CHOP** — file = absolute path to `runtime/output/speech.wav`.
-3. On `/luzifer/play` == `1`, pulse reload + play; route through your VST FX.
-4. Optionally map `/luzifer/state` to visuals / lighting.
+1. **OSC In DAT** — network port `9000`, parse `/luzifer/*` outbound (see [OSC_SPEC.md](OSC_SPEC.md)).
+2. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`.
+3. **Audio File In CHOP** — file = absolute path to `runtime/output/speech.wav`.
+4. On `/luzifer/play` == `1`, pulse reload + play; route through your VST FX.
+5. Optionally map `/luzifer/state` to visuals / lighting.
 
 ## Live config
 
-The dashboard `PUT /api/config` updates the in-memory `ConfigStore` and rewrites `config.yaml`. Prompt, LLM, VAD, TTS, and OSC host/port apply without restarting; mic device/rate changes reopen the input stream on the next listen turn.
+The dashboard `PUT /api/config` updates the in-memory `ConfigStore` and rewrites `config.yaml`. Prompt, LLM, VAD, TTS, and OSC host/ports apply without restarting; mic device/rate changes reopen the input stream on the next listen turn. Inbound OSC listen port rebinds on save.

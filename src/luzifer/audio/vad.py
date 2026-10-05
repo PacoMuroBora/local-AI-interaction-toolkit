@@ -32,6 +32,7 @@ class VoiceActivityDetector:
         self._sample_rate = 16000
         self._channels = 1
         self._started = False
+        self.metrics: Any | None = None
         self._load_model()
 
     def _load_model(self) -> None:
@@ -57,6 +58,10 @@ class VoiceActivityDetector:
         if status:
             logger.debug("sounddevice status: {}", status)
         mono = indata[:, 0].copy() if indata.ndim > 1 else indata.copy()
+        if self.metrics is not None:
+            # peak abs — O(n) on 512 samples, no alloc beyond the frame copy we already do
+            peak = float(np.max(np.abs(mono))) if mono.size else 0.0
+            self.metrics.note_input_peak(peak)
         try:
             self._q.put_nowait(mono.astype(np.float32))
         except queue.Full:

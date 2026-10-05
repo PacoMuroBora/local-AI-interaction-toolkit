@@ -5,7 +5,7 @@ alwaysApply: true
 
 # TouchDesigner OSC + gating
 
-OSC must match TouchDesigner `OSC In DAT` exactly:
+## Luzifer → TD (default `127.0.0.1:9000`)
 
 | Address | Type | Values |
 |---------|------|--------|
@@ -14,7 +14,17 @@ OSC must match TouchDesigner `OSC In DAT` exactly:
 | `/luzifer/ai_text` | string | LLM reply |
 | `/luzifer/play` | int | `1` after `speech.wav` is written |
 
+## TD → Luzifer (default `127.0.0.1:9001`)
+
+| Address | Type | Values |
+|---------|------|--------|
+| `/luzifer/in/say` | string | inject visitor text (LLM+TTS) |
+| `/luzifer/in/speak` | string | TTS-only line |
+| `/luzifer/in/reset` | int | `1` clear history |
+| `/luzifer/in/interrupt` | int | `1` abort turn |
+| `/luzifer/in/listen` | int | `1` unmute / `0` mute mic |
+
 - WAV path: `runtime/output/speech.wav` (reload on `/luzifer/play`).
 - Mic / VAD stream MUST stop whenever `state != "listening"` (covers `thinking` and `speaking` anti-feedback).
 - Do not invent new `/luzifer/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
-- Send OSC via `TouchDesignerOscClient` (`asyncio.to_thread` + lock); no raw socket one-offs in the pipeline.
+- Send OSC via `TouchDesignerOscClient`; receive via `TouchDesignerOscServer`. No raw socket one-offs in the pipeline.

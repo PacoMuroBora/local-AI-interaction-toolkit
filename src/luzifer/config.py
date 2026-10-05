@@ -37,6 +37,7 @@ class LlmSettings(BaseModel):
     temperature: float = 0.7
     top_p: float = 0.9
     max_tokens: int = 256
+    history_turns: int = 12
 
 
 class TtsSettings(BaseModel):
@@ -44,11 +45,15 @@ class TtsSettings(BaseModel):
     voice: str = "af_heart"
     speed: float = 1.0
     output_path: str = "runtime/output/speech.wav"
+    output_device_id: int | None = None
+    monitor_local: bool = False
 
 
 class OscSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 9000
+    listen_host: str = "127.0.0.1"
+    listen_port: int = 9001
 
 
 class DashboardSettings(BaseModel):
