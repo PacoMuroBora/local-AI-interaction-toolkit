@@ -43,7 +43,7 @@ class WhisperEngine:
     def _transcribe_sync(self, audio: np.ndarray, settings: SttSettings) -> str:
         self._ensure_model(settings)
         if self._mock or self._model is None:
-            duration = audio.size / max(settings.model_size and 16000 or 16000, 1)
+            duration = float(audio.size) / 16000.0
             return f"[mock transcript {duration:.1f}s]"
 
         segments, _info = self._model.transcribe(
