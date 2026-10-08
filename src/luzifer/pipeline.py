@@ -71,6 +71,17 @@ class Pipeline:
             if asyncio.iscoroutine(result):
                 await result
 
+    @property
+    def mic_on(self) -> bool:
+        return self.is_listening()
+
+    @property
+    def thinking(self) -> bool:
+        return self.state == "thinking"
+
+    @property
+    def ai_speaking(self) -> bool:
+        return self.state == "speaking"
     def is_listening(self) -> bool:
         return self._running and self.state == "listening" and self._mic_enabled
 
@@ -232,6 +243,7 @@ class Pipeline:
             if not self._mic_enabled:
                 self.vad.stop_stream()
             logger.info("mic_enabled={}", self._mic_enabled)
+            await self._notify()
             return "consume"
         if cmd.kind == "say":
             if not cmd.text:
@@ -310,15 +322,22 @@ class Pipeline:
 
         self.metrics.note_output_peak(peak)
         await self.osc.send_play()
+        pad = settings.audio.speaking_tail_pad_ms / 1000.0
+
         if settings.tts.monitor_local:
+            # Local playback is the clock — resume listening as soon as it ends.
             try:
                 await self.tts.play_local(out_path, settings.tts.output_device_id)
             except asyncio.CancelledError:
                 await self.set_state("listening")
                 raise
+            if pad > 0 and await self._wait_or_interrupt(pad):
+                await self.set_state("listening")
+                return
+        else:
+            # TD plays the wav; wait estimated duration (+ optional pad) then open mic.
+            if await self._wait_or_interrupt(max(0.05, duration + pad)):
+                await self.set_state("listening")
+                return
 
-        pad = settings.audio.speaking_tail_pad_ms / 1000.0
-        if await self._wait_or_interrupt(max(0.1, duration + pad)):
-            await self.set_state("listening")
-            return
         await self.set_state("listening")

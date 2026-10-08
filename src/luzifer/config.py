@@ -21,7 +21,7 @@ class AudioSettings(BaseModel):
     channels: int = 1
     vad_threshold: float = 0.5
     silence_duration_ms: int = 700
-    speaking_tail_pad_ms: int = 400
+    speaking_tail_pad_ms: int = 50
 
 
 class SttSettings(BaseModel):
