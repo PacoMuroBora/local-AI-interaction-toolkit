@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from loguru import logger
 
-from luzifer.audio.envelope import peak_envelope
 from luzifer.audio.vad import VoiceActivityDetector
-from luzifer.config import ConfigStore
+from luzifer.config import ConfigStore, TtsSettings
 from luzifer.llm.ollama import ChatMessage, OllamaEngine
 from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
@@ -21,6 +21,60 @@ from luzifer.tts.kokoro import TtsEngine
 StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
 StateListener = Callable[[StateName, str, str], Awaitable[None] | None]
 CommandKind = Literal["say", "speak", "reset", "interrupt", "listen"]
+
+_DE_HINT = re.compile(
+    r"[äöüÄÖÜß]|\b(ich|nicht|und|das|ist|ein|eine|der|die|mit|auch|wie|was|warum|hallo|bitte)\b",
+    re.IGNORECASE,
+)
+_EN_HINT = re.compile(
+    r"\b(the|and|you|what|is|are|this|that|with|have|why|how|hello|please)\b",
+    re.IGNORECASE,
+)
+
+
+def guess_lang_from_text(text: str) -> str | None:
+    """Cheap fallback for typed/OSC lines (no Whisper). Prefer explicit DE markers."""
+    if not text or not text.strip():
+        return None
+    if any(c in text for c in "äöüÄÖÜß"):
+        return "de"
+    de_hits = len(_DE_HINT.findall(text))
+    en_hits = len(_EN_HINT.findall(text))
+    if de_hits > en_hits:
+        return "de"
+    if en_hits > de_hits:
+        return "en"
+    return None
+
+
+def normalize_lang(code: str | None) -> str | None:
+    if not code:
+        return None
+    return str(code).split("-")[0].lower().strip() or None
+
+
+def resolve_tts_for_lang(tts: TtsSettings, lang: str | None) -> TtsSettings:
+    """Copy TTS settings with voice/lang overridden for this turn's language."""
+    out = tts.model_copy(deep=True)
+    code = normalize_lang(lang)
+    if not out.match_input_language or not code:
+        return out
+    voice = out.voice_by_lang.get(code)
+    if voice:
+        out.voice = voice
+    kokoro_lang = out.lang_by_lang.get(code)
+    if kokoro_lang:
+        out.lang = kokoro_lang
+    return out
+
+
+def language_system_suffix(lang: str | None) -> str:
+    code = normalize_lang(lang)
+    if code == "de":
+        return "\n\nReply in German only for this turn."
+    if code == "en":
+        return "\n\nReply in English only for this turn."
+    return ""
 
 
 @dataclass
@@ -55,6 +109,8 @@ class Pipeline:
         self.state: StateName = "listening"
         self.last_user_text = ""
         self.last_ai_text = ""
+        # Language of the most recent user input only (Whisper or text heuristic).
+        self.last_language: str | None = None
         self._running = False
         self._mic_enabled = True
         self._listeners: list[StateListener] = []
@@ -156,10 +212,17 @@ class Pipeline:
         self._history.clear()
         self.last_user_text = ""
         self.last_ai_text = ""
+        self.last_language = None
         await self.osc.send_user_text("")
         await self.osc.send_ai_text("")
         await self.set_state("listening")
         logger.info("Session reset")
+
+    def _set_turn_language(self, lang: str | None, *, source: str) -> None:
+        """Overwrite turn language from this input only — never blend with history."""
+        code = normalize_lang(lang)
+        self.last_language = code
+        logger.info("turn language={} source={}", code, source)
 
     async def _wait_or_interrupt(self, seconds: float) -> bool:
         """Sleep up to seconds; return True if interrupt won."""
@@ -188,6 +251,7 @@ class Pipeline:
             settings = await self.store.get()
             self.osc.reconfigure(settings.osc.host, settings.osc.port)
             await self.osc.clear_play(force=True)
+            await self.tts.preload(settings.tts)
             await self.set_state("listening")
             self._level_task = asyncio.create_task(self._stream_levels(), name="levels")
             logger.info("Pipeline started")
@@ -287,7 +351,9 @@ class Pipeline:
             return
 
         await self.set_state("stt")
-        user_text = (await self.stt.transcribe(audio, settings.stt)).strip()
+        transcript = await self.stt.transcribe(audio, settings.stt)
+        user_text = transcript.text.strip()
+        self._set_turn_language(transcript.language, source="stt")
         await self._run_cancellable(self._run_say_turn(user_text))
 
     async def _handle_control(self, cmd: PipelineCommand) -> Literal["consume", "turn", "none"]:
@@ -308,11 +374,16 @@ class Pipeline:
         if cmd.kind == "say":
             if not cmd.text:
                 return "consume"
+            self._set_turn_language(guess_lang_from_text(cmd.text), source="text")
             await self._run_cancellable(self._run_say_turn(cmd.text))
             return "turn"
         if cmd.kind == "speak":
             if not cmd.text:
                 return "consume"
+            # Speak-only: keep last mic language unless the text itself is clearly DE/EN.
+            guessed = guess_lang_from_text(cmd.text)
+            if guessed:
+                self._set_turn_language(guessed, source="text")
             await self._run_cancellable(self._run_speak_only(cmd.text))
             return "turn"
         return "none"
@@ -330,10 +401,12 @@ class Pipeline:
 
         await self.set_state("thinking")
         history = list(self._history) if settings.llm.history_turns > 0 else []
+        # Language instruction is per-call only — not stored in history / not averaged.
+        system = settings.system_prompt + language_system_suffix(self.last_language)
         try:
             ai_text = await self.llm.chat(
                 user_text,
-                settings.system_prompt,
+                system,
                 settings.llm,
                 history=history,
             )
@@ -368,10 +441,11 @@ class Pipeline:
             return
 
         settings = await self.store.get()
+        tts = resolve_tts_for_lang(settings.tts, self.last_language)
         await self.set_state("synthesizing")
         out_path = settings.resolve_output_path()
         try:
-            duration, peak = await self.tts.synthesize(text, out_path, settings.tts)
+            duration, peak, envelope = await self.tts.synthesize(text, out_path, tts)
         except asyncio.CancelledError:
             await self.set_state("listening")
             raise
@@ -381,7 +455,6 @@ class Pipeline:
             return
 
         self.metrics.note_output_peak(peak)
-        envelope = await asyncio.to_thread(peak_envelope, out_path, LEVEL_HZ)
         await self.set_state("speaking")
         self.metrics.arm_output(envelope, 1.0 / LEVEL_HZ)
         await self.osc.send_play()

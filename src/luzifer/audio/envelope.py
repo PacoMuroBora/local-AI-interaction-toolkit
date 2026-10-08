@@ -8,6 +8,18 @@ from pathlib import Path
 import numpy as np
 
 
+def peak_envelope_samples(audio: np.ndarray, sample_rate: int, hz: float = 30.0) -> np.ndarray:
+    """Max |sample| per hop from an already-decoded mono float buffer."""
+    if audio.size == 0 or sample_rate <= 0:
+        return np.zeros(1, dtype=np.float32)
+    pcm = np.abs(np.asarray(audio, dtype=np.float32).reshape(-1))
+    hop = max(1, int(round(sample_rate / hz)))
+    hops = pcm.size // hop
+    if hops <= 0:
+        return np.array([float(pcm.max())], dtype=np.float32)
+    return pcm[: hops * hop].reshape(hops, hop).max(axis=1).astype(np.float32)
+
+
 def peak_envelope(path: Path, hz: float = 30.0) -> np.ndarray:
     """Max |sample| per hop, linear 0..1. Empty or unreadable files return [0]."""
     try:
@@ -29,9 +41,4 @@ def peak_envelope(path: Path, hz: float = 30.0) -> np.ndarray:
     else:
         pcm = np.abs(pcm)
 
-    hop = max(1, int(round(sample_rate / hz)))
-    hops = pcm.size // hop
-    if hops <= 0:
-        peak = float(pcm.max()) if pcm.size else 0.0
-        return np.array([peak], dtype=np.float32)
-    return pcm[: hops * hop].reshape(hops, hop).max(axis=1).astype(np.float32)
+    return peak_envelope_samples(pcm, int(sample_rate), hz)

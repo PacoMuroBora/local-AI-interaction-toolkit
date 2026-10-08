@@ -44,9 +44,31 @@ class TtsSettings(BaseModel):
     engine: str = "kokoro"
     voice: str = "af_heart"
     speed: float = 1.0
+    # ONNX Runtime: device selects the EP (cuda → CUDAExecutionProvider).
+    # compute_type is kept for parity with STT; Kokoro runs the exported graph as-is.
+    device: str = "cuda"
+    compute_type: str = "float32"
     output_path: str = "runtime/output/speech.wav"
     output_device_id: int | None = None
     monitor_local: bool = False
+    # Match TTS voice/lang to the *last* STT utterance language only (not history).
+    match_input_language: bool = True
+    # Kokoro espeak lang for the active synth call (overridden per turn when matching).
+    lang: str = "en-us"
+    # ISO 639-1 → Kokoro voice id or Piper voice stem.
+    voice_by_lang: dict[str, str] = Field(
+        default_factory=lambda: {
+            "en": "am_onyx",
+            "de": "am_onyx",
+        }
+    )
+    # ISO 639-1 → Kokoro/espeak lang code (ignored by Piper).
+    lang_by_lang: dict[str, str] = Field(
+        default_factory=lambda: {
+            "en": "en-us",
+            "de": "de",
+        }
+    )
 
 
 class OscSettings(BaseModel):

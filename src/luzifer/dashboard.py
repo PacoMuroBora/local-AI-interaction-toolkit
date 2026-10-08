@@ -158,8 +158,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <option>large-v2</option><option>large-v3</option>
             <option>distil-large-v3</option>
           </select>
-          <label>Device</label><input id="stt.device" />
-          <label>Compute Type</label><input id="stt.compute_type" />
+          <label>Device</label>
+          <select id="stt.device">
+            <option value="cuda">cuda</option>
+            <option value="cpu">cpu</option>
+          </select>
+          <label>Compute Type</label>
+          <select id="stt.compute_type">
+            <option value="float16">float16</option>
+            <option value="int8">int8</option>
+            <option value="float32">float32</option>
+            <option value="int8_float16">int8_float16</option>
+          </select>
           <label>Language (empty = auto)</label><input id="stt.language" />
           <h2 style="margin-top:1rem">Whisper Cache</h2>
           <div id="whisper-models" class="model-list"></div>
@@ -176,12 +186,29 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Voice</label>
           <select id="tts.voice"></select>
           <label>Speed</label><input id="tts.speed" type="number" step="0.05" />
+          <label>Device</label>
+          <select id="tts.device">
+            <option value="cuda">cuda</option>
+            <option value="cpu">cpu</option>
+            <option value="dml">dml (DirectML)</option>
+          </select>
+          <label>Compute Type</label>
+          <select id="tts.compute_type">
+            <option value="float32">float32</option>
+            <option value="float16">float16</option>
+          </select>
           <label>WAV Output Path</label><input id="tts.output_path" />
           <label>Local Output Device</label><select id="tts.output_device_id"></select>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
             <input id="tts.monitor_local" type="checkbox" style="width:auto" />
             Monitor locally (play speech.wav on this machine)
           </label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
+            <input id="tts.match_input_language" type="checkbox" style="width:auto" />
+            Match voice/lang to last input language (not history)
+          </label>
+          <label>Voice when EN</label><input id="tts.voice_by_lang.en" placeholder="am_onyx" />
+          <label>Voice when DE</label><input id="tts.voice_by_lang.de" placeholder="am_onyx" />
         </div>
         <div>
           <h2>TTS Assets</h2>
@@ -232,7 +259,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <span class="direct-play-label">Direct playback</span>
       </label>
     </div>
-    <div class="live"><strong>User:</strong> <span id="user_text"></span></div>
+    <div class="live"><strong>User:</strong> <span id="user_lang" style="opacity:.55;margin-right:.35rem"></span><span id="user_text"></span></div>
     <div class="live" style="margin-top:.5rem"><strong>AI:</strong> <span id="ai_text"></span></div>
     <div class="debug">
       <div style="flex:1;min-width:260px">
@@ -252,7 +279,8 @@ const PATHS = [
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
   "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.speaking_tail_pad_ms",
   "stt.model_size","stt.device","stt.compute_type","stt.language",
-  "tts.engine","tts.voice","tts.speed","tts.output_path",
+  "tts.engine","tts.voice","tts.speed","tts.device","tts.compute_type","tts.output_path",
+  "tts.voice_by_lang.en","tts.voice_by_lang.de",
   "osc.host","osc.port","osc.listen_host","osc.listen_port"
 ];
 let KOKORO_VOICES = [];
@@ -413,6 +441,7 @@ async function loadConfig(){
     el.value = val == null ? "" : val;
   }
   setMonitorLocal(!!cfg.tts.monitor_local);
+  document.getElementById("tts.match_input_language").checked = !!cfg.tts.match_input_language;
   await loadDevices("input", "audio.input_device_id", cfg.audio.input_device_id);
   await loadDevices("output", "tts.output_device_id", cfg.tts.output_device_id);
   await refreshLlmModels();
@@ -428,6 +457,10 @@ async function collectConfig(){
   set(cfg, "audio.input_device_id", document.getElementById("audio.input_device_id").value);
   set(cfg, "tts.output_device_id", document.getElementById("tts.output_device_id").value);
   cfg.tts.monitor_local = document.getElementById("tts.monitor_local").checked;
+  cfg.tts.match_input_language = document.getElementById("tts.match_input_language").checked;
+  cfg.tts.voice_by_lang = cfg.tts.voice_by_lang || {};
+  cfg.tts.voice_by_lang.en = document.getElementById("tts.voice_by_lang.en").value || cfg.tts.voice;
+  cfg.tts.voice_by_lang.de = document.getElementById("tts.voice_by_lang.de").value || cfg.tts.voice;
   const lang = document.getElementById("stt.language").value;
   cfg.stt.language = lang === "" ? null : lang;
   return cfg;
@@ -535,6 +568,10 @@ function connectWs(){
     }
     if (msg.state) document.getElementById("state").textContent = msg.state;
     if ("user_text" in msg) document.getElementById("user_text").textContent = msg.user_text || "";
+    if ("language" in msg) {
+      const lang = msg.language || "";
+      document.getElementById("user_lang").textContent = lang ? `[${lang}]` : "";
+    }
     if ("ai_text" in msg) document.getElementById("ai_text").textContent = msg.ai_text || "";
     if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
       setActivityFlags(activityPayload(msg));
@@ -619,6 +656,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "state": state,
                 "user_text": user_text,
                 "ai_text": ai_text,
+                "language": pipeline.last_language,
                 "mic_on": pipeline.mic_on,
                 "stt": pipeline.stt_active,
                 "thinking": pipeline.thinking,
@@ -786,6 +824,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "state": pipeline.state,
                     "user_text": pipeline.last_user_text,
                     "ai_text": pipeline.last_ai_text,
+                    "language": pipeline.last_language,
                     "mic_on": pipeline.mic_on,
                     "stt": pipeline.stt_active,
                     "thinking": pipeline.thinking,

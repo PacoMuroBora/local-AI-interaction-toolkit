@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from loguru import logger
 
 from luzifer.config import SttSettings
+
+
+@dataclass(frozen=True)
+class Transcript:
+    """One utterance. Language is from this clip only — never history."""
+
+    text: str
+    language: str | None = None  # ISO 639-1 from Whisper, e.g. "en" / "de"
+    language_probability: float | None = None
 
 
 class WhisperEngine:
@@ -45,13 +55,14 @@ class WhisperEngine:
             self._loaded_key = key
             self._mock = True
 
-    def _transcribe_sync(self, audio: np.ndarray, settings: SttSettings) -> str:
+    def _transcribe_sync(self, audio: np.ndarray, settings: SttSettings) -> Transcript:
         self._ensure_model(settings)
         if self._mock or self._model is None:
             duration = float(audio.size) / 16000.0
-            return f"[mock transcript {duration:.1f}s]"
+            locked = (settings.language or "").split("-")[0].lower() or None
+            return Transcript(text=f"[mock transcript {duration:.1f}s]", language=locked)
 
-        segments, _info = self._model.transcribe(
+        segments, info = self._model.transcribe(
             audio.astype(np.float32),
             language=settings.language,
             vad_filter=False,
@@ -62,7 +73,22 @@ class WhisperEngine:
             condition_on_previous_text=False,
         )
         text = " ".join(seg.text.strip() for seg in segments).strip()
-        return text
+        detected = getattr(info, "language", None)
+        if detected:
+            detected = str(detected).split("-")[0].lower()
+        # If language is locked in config, Whisper still fills info.language with that lock.
+        prob = getattr(info, "language_probability", None)
+        try:
+            prob_f = float(prob) if prob is not None else None
+        except (TypeError, ValueError):
+            prob_f = None
+        logger.info(
+            "STT lang={} p={:.2f} text={!r}",
+            detected,
+            prob_f or 0.0,
+            text[:80],
+        )
+        return Transcript(text=text, language=detected, language_probability=prob_f)
 
-    async def transcribe(self, audio: np.ndarray, settings: SttSettings) -> str:
+    async def transcribe(self, audio: np.ndarray, settings: SttSettings) -> Transcript:
         return await asyncio.to_thread(self._transcribe_sync, audio, settings)

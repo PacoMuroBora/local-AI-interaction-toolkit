@@ -21,8 +21,8 @@ audio:
   sample_rate: 16000
   channels: 1
   vad_threshold: 0.5
-  silence_duration_ms: 1200
-  speaking_tail_pad_ms: 50
+  silence_duration_ms: 1800
+  speaking_tail_pad_ms: 100
 stt:
   model_size: medium
   compute_type: float16
@@ -30,18 +30,28 @@ stt:
   device: cuda
 llm:
   base_url: http://127.0.0.1:11434
-  model: qwen2.5:14b
+  model: qwen3:14b
   temperature: 0.7
   top_p: 0.9
-  max_tokens: 256
+  max_tokens: 2048
   history_turns: 12
 tts:
   engine: kokoro
   voice: am_onyx
   speed: 1.0
+  device: cuda
+  compute_type: float32
   output_path: runtime/output/speech.wav
   output_device_id: null
   monitor_local: false
+  match_input_language: true
+  lang: en-us
+  voice_by_lang:
+    en: am_onyx
+    de: am_onyx
+  lang_by_lang:
+    en: en-us
+    de: de
 osc:
   host: 127.0.0.1
   port: 9000

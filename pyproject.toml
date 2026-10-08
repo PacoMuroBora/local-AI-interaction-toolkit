@@ -21,7 +21,14 @@ dependencies = [
 stt = ["faster-whisper>=1.0.3"]
 vad = ["torch>=2.2.0", "torchaudio>=2.2.0"]
 tts = ["kokoro-onnx>=0.4.0", "piper-tts>=1.2.0"]
+# ORT 1.30 CUDA EP needs CUDA 13 + cuDNN 9 pip wheels (not just a system CUDA 12 toolkit).
+# Stop luzifer first, then: uv pip uninstall onnxruntime && uv sync --extra tts-gpu
+tts-gpu = [
+    "luzifer[tts]",
+    "onnxruntime-gpu[cuda,cudnn]>=1.20.0",
+]
 all = ["luzifer[stt,vad,tts]"]
+all-gpu = ["luzifer[stt,vad,tts-gpu]"]
 
 [project.scripts]
 luzifer = "luzifer.main:main"

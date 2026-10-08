@@ -72,7 +72,16 @@ Or use the dashboard Prompt / LLM tab (list + Pull). Change temperature / histor
 
 `faster-whisper` downloads the configured `stt.model_size` on first use, or via the Audio In tab Download buttons.
 
-On an NVIDIA GPU set `stt.device: cuda` and `stt.compute_type: float16` (dashboard Audio In). This uses **CTranslate2 CUDA**, not PyTorch — the CPU torch build is fine for Silero VAD. RTX 4080: `medium` + float16 is typically well under 2 GB VRAM and ~0.3s per short utterance. Lock `stt.language` (e.g. `en` / `de`) to skip language detection.
+On an NVIDIA GPU set `stt.device: cuda` and `stt.compute_type: float16` (dashboard Audio In). This uses **CTranslate2 CUDA**, not PyTorch — the CPU torch build is fine for Silero VAD. RTX 4080: `medium` + float16 is typically well under 2 GB VRAM and ~0.3s per short utterance. Leave `stt.language` empty for auto-detect (needed for bilingual DE/EN voice switching). Lock it (e.g. `en` / `de`) only if you want a fixed language.
+
+### Bilingual TTS (DE/EN)
+
+With `tts.match_input_language: true` (default), each turn uses Whisper’s language from **that utterance only** — never an average over chat history. That picks:
+
+- Kokoro `lang` via `tts.lang_by_lang` (`en` → `en-us`, `de` → `de`)
+- Voice via `tts.voice_by_lang` (same speaker for both is fine with Kokoro; for Piper use `en_US-lessac-medium` / `de_DE-thorsten-medium`)
+
+The LLM also gets a one-shot “reply in German/English this turn” suffix that is **not** written into history.
 
 ### Silero VAD (`--extra vad`)
 
@@ -86,6 +95,24 @@ Download from the Audio Out tab into `models/` (gitignored), or place manually:
 - Piper: `models/<voice>.onnx` (+ `.onnx.json`)
 
 `tts.engine` selects `kokoro` or `piper`. Missing models write a short beep wav so TD still gets a file.
+
+Audio Out **Device** / **Compute Type** mirror STT knobs. Kokoro uses ONNX Runtime: `cuda` → `CUDAExecutionProvider`.
+
+`onnxruntime-gpu` 1.30 is built for **CUDA 13 + cuDNN 9**. A system CUDA 12.x toolkit alone is not enough (`cublasLt64_13.dll` missing → silent CPU fallback). Install the pip CUDA/cuDNN wheels (stop `luzifer` first so DLLs unlock):
+
+```bash
+uv pip uninstall onnxruntime
+uv sync --extra tts-gpu
+# or: uv pip install "onnxruntime-gpu[cuda,cudnn]"
+```
+
+Validate in the log on preload/first synth:
+
+```
+Kokoro loaded … providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+```
+
+If you still see `Failed to create CUDAExecutionProvider` / only `CPUExecutionProvider`, CUDA is **not** in use. `cpu` always works. Piper ignores device/compute.
 
 ## TouchDesigner
 
