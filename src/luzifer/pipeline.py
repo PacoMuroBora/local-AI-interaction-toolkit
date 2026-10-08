@@ -82,14 +82,30 @@ class Pipeline:
     @property
     def ai_speaking(self) -> bool:
         return self.state == "speaking"
+
     def is_listening(self) -> bool:
         return self._running and self.state == "listening" and self._mic_enabled
+
+    async def _publish_flags(self, *, user_speaking: bool = False) -> None:
+        listening = self.state == "listening"
+        await self.osc.send_flags(
+            listening=listening,
+            user_speaking=user_speaking and listening,
+            thinking=self.state == "thinking",
+            ai_speaking=self.state == "speaking",
+        )
+
+    async def _on_user_speech(self, active: bool) -> None:
+        await self._publish_flags(user_speaking=active)
 
     async def set_state(self, state: StateName) -> None:
         self.state = state
         if state != "listening":
             self.vad.stop_stream()
         await self.osc.send_state(state)
+        await self._publish_flags(user_speaking=False)
+        if state != "speaking":
+            await self.osc.clear_play()
         await self._notify()
         logger.info("state={}", state)
 
@@ -155,20 +171,35 @@ class Pipeline:
 
     async def run(self) -> None:
         self._running = True
-        settings = await self.store.get()
-        self.osc.reconfigure(settings.osc.host, settings.osc.port)
-        await self.set_state("listening")
-        logger.info("Pipeline started")
+        try:
+            settings = await self.store.get()
+            self.osc.reconfigure(settings.osc.host, settings.osc.port)
+            await self.osc.clear_play(force=True)
+            await self.set_state("listening")
+            logger.info("Pipeline started")
 
-        while self._running:
+            while self._running:
+                try:
+                    await self._loop_once()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("Turn failed: {}", exc)
+                    await self.set_state("listening")
+                    await asyncio.sleep(0.5)
+        finally:
+            self._running = False
+            self.vad.stop_stream()
             try:
-                await self._loop_once()
-            except asyncio.CancelledError:
-                raise
+                await self.osc.send_flags(
+                    listening=False,
+                    user_speaking=False,
+                    thinking=False,
+                    ai_speaking=False,
+                )
+                await self.osc.clear_play(force=True)
             except Exception as exc:  # noqa: BLE001
-                logger.exception("Turn failed: {}", exc)
-                await self.set_state("listening")
-                await asyncio.sleep(0.5)
+                logger.debug("OSC shutdown clear failed: {}", exc)
 
     async def stop(self) -> None:
         self._running = False
@@ -195,7 +226,11 @@ class Pipeline:
         self._interrupt.clear()
 
         capture_task = asyncio.create_task(
-            self.vad.capture_utterance(settings.audio, is_listening=self.is_listening),
+            self.vad.capture_utterance(
+                settings.audio,
+                is_listening=self.is_listening,
+                on_speech=self._on_user_speech,
+            ),
             name="capture",
         )
         command_task = asyncio.create_task(self._commands.get(), name="command")

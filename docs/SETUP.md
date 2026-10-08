@@ -87,11 +87,11 @@ Download from the Audio Out tab into `models/` (gitignored), or place manually:
 
 ## TouchDesigner
 
-1. **OSC In DAT** — network port `9000`, parse `/luzifer/*` outbound (see [OSC_SPEC.md](OSC_SPEC.md)).
-2. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`.
-3. **Audio File In CHOP** — file = absolute path to `runtime/output/speech.wav`.
-4. On `/luzifer/play` == `1`, pulse reload + play; route through your VST FX.
-5. Optionally map `/luzifer/state` to visuals / lighting.
+1. **OSC In CHOP** — port `9000`. Int channels: `luzifer/listening`, `luzifer/user_speaking`, `luzifer/thinking`, `luzifer/ai_speaking`, `luzifer/play`. Inactive flags are sent as `0`.
+2. **OSC In DAT** — same port if Windows delivers to both; strings (`state`, `user_text`, `ai_text`) only show up here.
+3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`.
+4. **Audio File In CHOP** — file = absolute path to `runtime/output/speech.wav`. On `luzifer/play` off→on, pulse reload + play. `play` returns to `0` when speaking ends.
+5. Drive visuals from the 0/1 channels. CHOP recipe is in [OSC_SPEC.md](OSC_SPEC.md).
 
 ## Live config
 

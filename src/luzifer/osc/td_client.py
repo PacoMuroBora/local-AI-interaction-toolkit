@@ -14,6 +14,13 @@ ADDR_STATE = "/luzifer/state"
 ADDR_USER_TEXT = "/luzifer/user_text"
 ADDR_AI_TEXT = "/luzifer/ai_text"
 ADDR_PLAY = "/luzifer/play"
+# Int channels for OSC In CHOP. OSC bool (T/F) has no payload and TD often drops it.
+ADDR_LISTENING = "/luzifer/listening"
+ADDR_USER_SPEAKING = "/luzifer/user_speaking"
+ADDR_THINKING = "/luzifer/thinking"
+ADDR_AI_SPEAKING = "/luzifer/ai_speaking"
+
+FlagSnapshot = tuple[tuple[str, int], ...]
 
 
 class TouchDesignerOscClient:
@@ -24,6 +31,8 @@ class TouchDesignerOscClient:
         self._port = port
         self._client = SimpleUDPClient(host, port)
         self._lock = asyncio.Lock()
+        self._flags: FlagSnapshot | None = None
+        self._play = 0
 
     def reconfigure(self, host: str, port: int) -> None:
         if host == self._host and port == self._port:
@@ -34,12 +43,40 @@ class TouchDesignerOscClient:
         logger.info("OSC client retargeted to {}:{}", host, port)
 
     async def _send(self, address: str, value: str | int) -> None:
+        await self._send_many(((address, value),))
+
+    async def _send_many(self, messages: tuple[tuple[str, str | int], ...] | FlagSnapshot) -> None:
         async with self._lock:
-            await asyncio.to_thread(self._client.send_message, address, value)
+            def _flush() -> None:
+                for address, value in messages:
+                    self._client.send_message(address, value)
+
+            await asyncio.to_thread(_flush)
+        for address, value in messages:
             logger.debug("OSC {} {}", address, value)
 
     async def send_state(self, state: StateName) -> None:
         await self._send(ADDR_STATE, state)
+
+    async def send_flags(
+        self,
+        *,
+        listening: bool,
+        user_speaking: bool,
+        thinking: bool,
+        ai_speaking: bool,
+    ) -> None:
+        """Push the full 0/1 snapshot. OSC In CHOP holds the last value until a new one arrives."""
+        snapshot: FlagSnapshot = (
+            (ADDR_LISTENING, 1 if listening else 0),
+            (ADDR_USER_SPEAKING, 1 if user_speaking else 0),
+            (ADDR_THINKING, 1 if thinking else 0),
+            (ADDR_AI_SPEAKING, 1 if ai_speaking else 0),
+        )
+        if snapshot == self._flags:
+            return
+        self._flags = snapshot
+        await self._send_many(snapshot)
 
     async def send_user_text(self, text: str) -> None:
         await self._send(ADDR_USER_TEXT, text)
@@ -48,4 +85,11 @@ class TouchDesignerOscClient:
         await self._send(ADDR_AI_TEXT, text)
 
     async def send_play(self) -> None:
+        self._play = 1
         await self._send(ADDR_PLAY, 1)
+
+    async def clear_play(self, *, force: bool = False) -> None:
+        if not force and self._play == 0:
+            return
+        self._play = 0
+        await self._send(ADDR_PLAY, 0)

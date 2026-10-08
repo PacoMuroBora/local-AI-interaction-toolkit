@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import numpy as np
@@ -13,6 +13,7 @@ from loguru import logger
 from luzifer.config import AudioSettings
 
 GateFn = Callable[[], bool]
+SpeechFn = Callable[[bool], Awaitable[None]]
 
 
 class VoiceActivityDetector:
@@ -138,6 +139,7 @@ class VoiceActivityDetector:
         audio: AudioSettings,
         *,
         is_listening: GateFn,
+        on_speech: SpeechFn | None = None,
     ) -> np.ndarray | None:
         """Block until an utterance ends, or return None if the gate closes."""
         if not is_listening():
@@ -154,34 +156,40 @@ class VoiceActivityDetector:
         triggered = False
         silent_frames = 0
 
-        while is_listening():
-            try:
-                frame = await asyncio.to_thread(self._q.get, True, 0.2)
-            except queue.Empty:
-                continue
+        try:
+            while is_listening():
+                try:
+                    frame = await asyncio.to_thread(self._q.get, True, 0.2)
+                except queue.Empty:
+                    continue
 
-            # pad / trim to FRAME_SAMPLES
-            if frame.size < self.FRAME_SAMPLES:
-                frame = np.pad(frame, (0, self.FRAME_SAMPLES - frame.size))
-            elif frame.size > self.FRAME_SAMPLES:
-                frame = frame[: self.FRAME_SAMPLES]
+                # pad / trim to FRAME_SAMPLES
+                if frame.size < self.FRAME_SAMPLES:
+                    frame = np.pad(frame, (0, self.FRAME_SAMPLES - frame.size))
+                elif frame.size > self.FRAME_SAMPLES:
+                    frame = frame[: self.FRAME_SAMPLES]
 
-            prob = self._speech_prob(frame)
-            if not triggered:
-                if prob >= threshold:
-                    triggered = True
-                    chunks.append(frame)
+                prob = self._speech_prob(frame)
+                if not triggered:
+                    if prob >= threshold:
+                        triggered = True
+                        chunks.append(frame)
+                        silent_frames = 0
+                        if on_speech is not None:
+                            await on_speech(True)
+                    continue
+
+                chunks.append(frame)
+                if prob < threshold:
+                    silent_frames += 1
+                    if silent_frames >= silence_limit:
+                        break
+                else:
                     silent_frames = 0
-                continue
 
-            chunks.append(frame)
-            if prob < threshold:
-                silent_frames += 1
-                if silent_frames >= silence_limit:
-                    break
-            else:
-                silent_frames = 0
-
-        if not is_listening() or not chunks:
-            return None
-        return np.concatenate(chunks)
+            if not is_listening() or not chunks:
+                return None
+            return np.concatenate(chunks)
+        finally:
+            if triggered and on_speech is not None:
+                await on_speech(False)
