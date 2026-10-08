@@ -77,6 +77,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .flag.on.think .dot { background:#d29922; box-shadow:0 0 8px #d29922aa; }
     .flag.on.speak { color:#79b8ff; border-color:#1f6feb66; background:#1f6feb22; }
     .flag.on.speak .dot { background:#79b8ff; box-shadow:0 0 8px #79b8ffaa; }
+    .direct-play { display:inline-flex; align-items:center; gap:.55rem; margin-left:auto;
+      color:#9aa0a6; font-size:.8rem; font-weight:600; cursor:pointer; user-select:none; }
+    .direct-play input { position:absolute; opacity:0; width:0; height:0; }
+    .switch { width:2.2rem; height:1.2rem; border-radius:999px; background:#2a2f3a; border:1px solid #3d444d;
+      position:relative; transition:background .15s ease; flex-shrink:0; }
+    .switch::after { content:""; position:absolute; top:1px; left:1px; width:.95rem; height:.95rem;
+      border-radius:50%; background:#9aa0a6; transition:transform .15s ease, background .15s ease; }
+    .direct-play input:checked + .switch { background:#1f6feb66; border-color:#1f6feb; }
+    .direct-play input:checked + .switch::after { transform:translateX(1rem); background:#79b8ff; }
+    .direct-play input:checked ~ .direct-play-label { color:#79b8ff; }
     footer .debug { display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:.75rem; }
     footer .debug input { flex:1; min-width:220px; }
     #status { color:#9aa0a6; font-size:.85rem; }
@@ -210,6 +220,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <span id="flag-think" class="flag think"><span class="dot"></span>Thinking</span>
         <span id="flag-speak" class="flag speak"><span class="dot"></span>AI speaking</span>
       </div>
+      <label class="direct-play" title="Play speech.wav on this machine (skip waiting on TD)">
+        <input id="direct_playback" type="checkbox" />
+        <span class="switch"></span>
+        <span class="direct-play-label">Direct playback</span>
+      </label>
     </div>
     <div class="live"><strong>User:</strong> <span id="user_text"></span></div>
     <div class="live" style="margin-top:.5rem"><strong>AI:</strong> <span id="ai_text"></span></div>
@@ -391,7 +406,7 @@ async function loadConfig(){
     const val = get(cfg, p);
     el.value = val == null ? "" : val;
   }
-  document.getElementById("tts.monitor_local").checked = !!cfg.tts.monitor_local;
+  setMonitorLocal(!!cfg.tts.monitor_local);
   await loadDevices("input", "audio.input_device_id", cfg.audio.input_device_id);
   await loadDevices("output", "tts.output_device_id", cfg.tts.output_device_id);
   await refreshLlmModels();
@@ -411,6 +426,22 @@ async function collectConfig(){
   cfg.stt.language = lang === "" ? null : lang;
   return cfg;
 }
+
+function setMonitorLocal(on){
+  document.getElementById("tts.monitor_local").checked = !!on;
+  document.getElementById("direct_playback").checked = !!on;
+}
+
+async function saveMonitorLocal(on){
+  setMonitorLocal(on);
+  const cfg = await collectConfig();
+  cfg.tts.monitor_local = !!on;
+  const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
+  setStatus(res.ok ? (on ? "direct playback on" : "direct playback off") : "save failed");
+}
+
+document.getElementById("direct_playback").onchange = (ev) => saveMonitorLocal(ev.target.checked);
+document.getElementById("tts.monitor_local").onchange = (ev) => saveMonitorLocal(ev.target.checked);
 
 document.getElementById("save").onclick = async () => {
   const cfg = await collectConfig();

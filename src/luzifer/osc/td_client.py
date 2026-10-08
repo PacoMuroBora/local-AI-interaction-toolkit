@@ -19,6 +19,10 @@ ADDR_LISTENING = "/luzifer/listening"
 ADDR_USER_SPEAKING = "/luzifer/user_speaking"
 ADDR_THINKING = "/luzifer/thinking"
 ADDR_AI_SPEAKING = "/luzifer/ai_speaking"
+ADDR_IN_LEVEL = "/luzifer/in_level"
+ADDR_OUT_LEVEL = "/luzifer/out_level"
+
+OscArg = str | int | float
 
 FlagSnapshot = tuple[tuple[str, int], ...]
 
@@ -42,18 +46,24 @@ class TouchDesignerOscClient:
         self._client = SimpleUDPClient(host, port)
         logger.info("OSC client retargeted to {}:{}", host, port)
 
-    async def _send(self, address: str, value: str | int) -> None:
+    async def _send(self, address: str, value: OscArg) -> None:
         await self._send_many(((address, value),))
 
-    async def _send_many(self, messages: tuple[tuple[str, str | int], ...] | FlagSnapshot) -> None:
+    async def _send_many(
+        self,
+        messages: tuple[tuple[str, OscArg], ...],
+        *,
+        log: bool = True,
+    ) -> None:
         async with self._lock:
             def _flush() -> None:
                 for address, value in messages:
                     self._client.send_message(address, value)
 
             await asyncio.to_thread(_flush)
-        for address, value in messages:
-            logger.debug("OSC {} {}", address, value)
+        if log:
+            for address, value in messages:
+                logger.debug("OSC {} {}", address, value)
 
     async def send_state(self, state: StateName) -> None:
         await self._send(ADDR_STATE, state)
@@ -93,3 +103,13 @@ class TouchDesignerOscClient:
             return
         self._play = 0
         await self._send(ADDR_PLAY, 0)
+
+    async def send_levels(self, input_level: float, output_level: float) -> None:
+        """30 Hz meter. Not logged — it would flood the console."""
+        await self._send_many(
+            (
+                (ADDR_IN_LEVEL, float(input_level)),
+                (ADDR_OUT_LEVEL, float(output_level)),
+            ),
+            log=False,
+        )

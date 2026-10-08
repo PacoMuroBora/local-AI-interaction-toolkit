@@ -17,6 +17,8 @@ alwaysApply: true
 | `/luzifer/thinking` | int | `1` / `0` |
 | `/luzifer/ai_speaking` | int | `1` / `0` |
 | `/luzifer/play` | int | `1` after `speech.wav` is written, then `0` when speaking ends |
+| `/luzifer/in_level` | float | mic peak, 30 Hz, else `0` |
+| `/luzifer/out_level` | float | dry-wav envelope from the `play` edge, 30 Hz, else `0` |
 
 Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inactive channels are explicitly `0` — OSC In CHOP holds the last value.
 

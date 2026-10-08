@@ -21,7 +21,7 @@ audio:
   sample_rate: 16000
   channels: 1
   vad_threshold: 0.5
-  silence_duration_ms: 700
+  silence_duration_ms: 1200
   speaking_tail_pad_ms: 50
 stt:
   model_size: medium
@@ -41,7 +41,7 @@ tts:
   speed: 1.0
   output_path: runtime/output/speech.wav
   output_device_id: null
-  monitor_local: true
+  monitor_local: false
 osc:
   host: 127.0.0.1
   port: 9000

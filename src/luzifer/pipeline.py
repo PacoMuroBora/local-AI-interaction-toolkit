@@ -9,10 +9,11 @@ from typing import Any, Literal
 
 from loguru import logger
 
+from luzifer.audio.envelope import peak_envelope
 from luzifer.audio.vad import VoiceActivityDetector
 from luzifer.config import ConfigStore
 from luzifer.llm.ollama import ChatMessage, OllamaEngine
-from luzifer.metrics import MetricsStore
+from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
 from luzifer.stt.whisper import WhisperEngine
 from luzifer.tts.kokoro import TtsEngine
@@ -60,6 +61,7 @@ class Pipeline:
         self._history: list[ChatMessage] = []
         self._commands: asyncio.Queue[PipelineCommand] = asyncio.Queue()
         self._active_task: asyncio.Task[Any] | None = None
+        self._level_task: asyncio.Task[Any] | None = None
         self._interrupt = asyncio.Event()
 
     def on_state(self, listener: StateListener) -> None:
@@ -105,6 +107,7 @@ class Pipeline:
         await self.osc.send_state(state)
         await self._publish_flags(user_speaking=False)
         if state != "speaking":
+            self.metrics.disarm_output()
             await self.osc.clear_play()
         await self._notify()
         logger.info("state={}", state)
@@ -176,6 +179,7 @@ class Pipeline:
             self.osc.reconfigure(settings.osc.host, settings.osc.port)
             await self.osc.clear_play(force=True)
             await self.set_state("listening")
+            self._level_task = asyncio.create_task(self._stream_levels(), name="levels")
             logger.info("Pipeline started")
 
             while self._running:
@@ -190,6 +194,14 @@ class Pipeline:
         finally:
             self._running = False
             self.vad.stop_stream()
+            self.metrics.disarm_output()
+            if self._level_task is not None:
+                self._level_task.cancel()
+                try:
+                    await self._level_task
+                except asyncio.CancelledError:
+                    pass
+                self._level_task = None
             try:
                 await self.osc.send_flags(
                     listening=False,
@@ -197,6 +209,7 @@ class Pipeline:
                     thinking=False,
                     ai_speaking=False,
                 )
+                await self.osc.send_levels(0.0, 0.0)
                 await self.osc.clear_play(force=True)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("OSC shutdown clear failed: {}", exc)
@@ -356,6 +369,8 @@ class Pipeline:
             return
 
         self.metrics.note_output_peak(peak)
+        envelope = await asyncio.to_thread(peak_envelope, out_path, LEVEL_HZ)
+        self.metrics.arm_output(envelope, 1.0 / LEVEL_HZ)
         await self.osc.send_play()
         pad = settings.audio.speaking_tail_pad_ms / 1000.0
 
@@ -376,3 +391,17 @@ class Pipeline:
                 return
 
         await self.set_state("listening")
+
+    async def _stream_levels(self) -> None:
+        interval = 1.0 / LEVEL_HZ
+        while True:
+            try:
+                await self.osc.send_levels(
+                    self.metrics.take_input_level(),
+                    self.metrics.output_level_now(),
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("level stream: {}", exc)
+            await asyncio.sleep(interval)

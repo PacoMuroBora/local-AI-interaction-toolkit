@@ -30,7 +30,7 @@ docs/                 # setup + OSC spec
 
 | Direction | Default | Addresses |
 |-----------|---------|-----------|
-| → TD | `127.0.0.1:9000` | `/luzifer/state`, `/user_text`, `/ai_text`, `/listening`, `/user_speaking`, `/thinking`, `/ai_speaking`, `/play` |
+| → TD | `127.0.0.1:9000` | `/luzifer/state`, `/user_text`, `/ai_text`, `/listening`, `/user_speaking`, `/thinking`, `/ai_speaking`, `/play`, `/in_level`, `/out_level` |
 | ← TD | `127.0.0.1:9001` | `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen` |
 
 Full table + TD wiring: [docs/OSC_SPEC.md](docs/OSC_SPEC.md)

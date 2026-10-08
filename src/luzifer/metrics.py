@@ -5,7 +5,12 @@ from __future__ import annotations
 import asyncio
 import shutil
 import subprocess
+import time
 from typing import Any
+
+import numpy as np
+
+LEVEL_HZ = 30.0
 
 
 class MetricsStore:
@@ -15,6 +20,11 @@ class MetricsStore:
         self.input_level = 0.0
         self.output_level = 0.0
         self._out_hold = 0.0
+        self._input_pending = 0.0
+        self._input_stamp = 0.0
+        self._out_env: np.ndarray | None = None
+        self._out_t0: float | None = None
+        self._out_hop = 1.0 / LEVEL_HZ
         self.gpu_name = ""
         self.gpu_util = 0.0
         self.vram_used_mb = 0.0
@@ -22,10 +32,41 @@ class MetricsStore:
         self.gpu_available = False
 
     def note_input_peak(self, peak: float) -> None:
-        # Cheap peak-hold; decay happens in tick()
-        p = abs(float(peak))
+        # Cheap peak-hold; decay happens in tick(). _input_pending is the OSC meter.
+        p = min(1.0, abs(float(peak)))
         if p > self.input_level:
-            self.input_level = min(1.0, p)
+            self.input_level = p
+        if p > self._input_pending:
+            self._input_pending = p
+        self._input_stamp = time.monotonic()
+
+    def take_input_level(self) -> float:
+        """Max mic peak since the last call. 0 once the callback goes quiet (mic closed)."""
+        if time.monotonic() - self._input_stamp > 0.12:
+            self._input_pending = 0.0
+            return 0.0
+        level = self._input_pending
+        self._input_pending = 0.0
+        return level
+
+    def arm_output(self, envelope: np.ndarray, hop_s: float) -> None:
+        self._out_env = np.asarray(envelope, dtype=np.float32)
+        self._out_hop = hop_s if hop_s > 0 else 1.0 / LEVEL_HZ
+        self._out_t0 = time.monotonic()
+
+    def disarm_output(self) -> None:
+        self._out_env = None
+        self._out_t0 = None
+
+    def output_level_now(self) -> float:
+        env = self._out_env
+        t0 = self._out_t0
+        if env is None or t0 is None or env.size == 0:
+            return 0.0
+        index = int((time.monotonic() - t0) / self._out_hop)
+        if index < 0 or index >= int(env.size):
+            return 0.0
+        return float(env[index])
 
     def note_output_peak(self, peak: float) -> None:
         p = min(1.0, abs(float(peak)))
