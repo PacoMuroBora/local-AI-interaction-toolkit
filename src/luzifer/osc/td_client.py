@@ -8,7 +8,7 @@ from typing import Literal
 from loguru import logger
 from pythonosc.udp_client import SimpleUDPClient
 
-StateName = Literal["listening", "thinking", "speaking"]
+StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
 
 ADDR_STATE = "/luzifer/state"
 ADDR_USER_TEXT = "/luzifer/user_text"
@@ -17,7 +17,9 @@ ADDR_PLAY = "/luzifer/play"
 # Int channels for OSC In CHOP. OSC bool (T/F) has no payload and TD often drops it.
 ADDR_LISTENING = "/luzifer/listening"
 ADDR_USER_SPEAKING = "/luzifer/user_speaking"
+ADDR_STT = "/luzifer/stt"
 ADDR_THINKING = "/luzifer/thinking"
+ADDR_SYNTHESIZING = "/luzifer/synthesizing"
 ADDR_AI_SPEAKING = "/luzifer/ai_speaking"
 ADDR_IN_LEVEL = "/luzifer/in_level"
 ADDR_OUT_LEVEL = "/luzifer/out_level"
@@ -73,14 +75,18 @@ class TouchDesignerOscClient:
         *,
         listening: bool,
         user_speaking: bool,
+        stt: bool,
         thinking: bool,
+        synthesizing: bool,
         ai_speaking: bool,
     ) -> None:
         """Push the full 0/1 snapshot. OSC In CHOP holds the last value until a new one arrives."""
         snapshot: FlagSnapshot = (
             (ADDR_LISTENING, 1 if listening else 0),
             (ADDR_USER_SPEAKING, 1 if user_speaking else 0),
+            (ADDR_STT, 1 if stt else 0),
             (ADDR_THINKING, 1 if thinking else 0),
+            (ADDR_SYNTHESIZING, 1 if synthesizing else 0),
             (ADDR_AI_SPEAKING, 1 if ai_speaking else 0),
         )
         if snapshot == self._flags:

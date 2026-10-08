@@ -13,20 +13,22 @@ Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 
 | Address | Type | Example | TouchDesigner behavior |
 |---------|------|---------|------------------------|
-| `/luzifer/state` | string | `listening` | DAT only. Values: `listening`, `thinking`, `speaking`. |
+| `/luzifer/state` | string | `listening` | DAT only. Values: `listening`, `stt`, `thinking`, `synthesizing`, `speaking`. |
 | `/luzifer/user_text` | string | `Who are you?` | DAT only. Visitor transcript. |
 | `/luzifer/ai_text` | string | `I am Luzifer…` | DAT only. AI reply. |
 | `/luzifer/listening` | int | `1` or `0` | CHOP. `1` while the pipeline is in `listening`. |
 | `/luzifer/user_speaking` | int | `1` or `0` | CHOP. `1` only while VAD hears the visitor. `0` the moment they stop, and whenever state is not `listening`. |
-| `/luzifer/thinking` | int | `1` or `0` | CHOP. `1` during STT + LLM. |
-| `/luzifer/ai_speaking` | int | `1` or `0` | CHOP. `1` for the whole speak phase (synth, playback, tail). |
+| `/luzifer/stt` | int | `1` or `0` | CHOP. `1` while Whisper is transcribing. |
+| `/luzifer/thinking` | int | `1` or `0` | CHOP. `1` while the LLM is generating. |
+| `/luzifer/synthesizing` | int | `1` or `0` | CHOP. `1` while TTS is writing `speech.wav`. |
+| `/luzifer/ai_speaking` | int | `1` or `0` | CHOP. `1` during playback + tail (after the file exists). |
 | `/luzifer/play` | int | `1` then `0` | CHOP. `1` once `speech.wav` is written. Back to `0` when speaking ends, so the next line is a rising edge. |
 | `/luzifer/in_level` | float | `0.0`–`1.0` | CHOP. Mic peak, 30 Hz. `0` within ~120 ms of the mic closing. |
 | `/luzifer/out_level` | float | `0.0`–`1.0` | CHOP. Dry-wav peak envelope, 30 Hz, clocked from the `play` edge. `0` while synthesizing and after the file ends. Not the post-VST level. |
 
-Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all four addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
+Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all six addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
 
-`listening` and `user_speaking` can both be `1`. The other combinations are exclusive. Idle with the mic armed is `listening=1` and the other three `0`. Clean shutdown sends all four `0` and `play=0`. A hard kill cannot send that; the CHOP keeps the last numbers.
+`listening` and `user_speaking` can both be `1`. `stt` / `thinking` / `synthesizing` / `ai_speaking` are exclusive. Idle with the mic armed is `listening=1` and the other flags `0`. Clean shutdown sends every flag `0` and `play=0`. A hard kill cannot send that; the CHOP keeps the last numbers.
 
 ### Ordering
 
@@ -34,10 +36,10 @@ Typical turn:
 
 1. `/luzifer/listening` → `1`, other flags → `0`
 2. Visitor starts talking → `/luzifer/user_speaking` → `1`
-3. Visitor stops → `/luzifer/user_speaking` → `0`, then `/luzifer/thinking` → `1`, `/luzifer/listening` → `0`
-4. `/luzifer/user_text`, `/luzifer/ai_text`
-5. `/luzifer/ai_speaking` → `1`, `/luzifer/thinking` → `0` (wav not ready yet, `play` still `0`)
-6. File write completes → `/luzifer/play` → `1` and `/luzifer/out_level` starts the envelope
+3. Visitor stops → `/luzifer/user_speaking` → `0`, `/luzifer/stt` → `1`, `/luzifer/listening` → `0`
+4. `/luzifer/user_text`, then `/luzifer/thinking` → `1`, `/luzifer/stt` → `0`
+5. `/luzifer/ai_text`, then `/luzifer/synthesizing` → `1`, `/luzifer/thinking` → `0`
+6. File ready → `/luzifer/ai_speaking` → `1`, `/luzifer/synthesizing` → `0`, `/luzifer/play` → `1`, `/luzifer/out_level` starts
 7. After wav duration + tail → `/luzifer/play` → `0`, `/luzifer/out_level` → `0`, `/luzifer/ai_speaking` → `0`, `/luzifer/listening` → `1`
 
 ### OSC In CHOP
@@ -46,7 +48,9 @@ Port `9000`. Strings never become channels; that's why the CHOP in the screensho
 
 - `luzifer/listening`
 - `luzifer/user_speaking`
+- `luzifer/stt`
 - `luzifer/thinking`
+- `luzifer/synthesizing`
 - `luzifer/ai_speaking`
 - `luzifer/play`
 - `luzifer/in_level`
@@ -59,17 +63,11 @@ op('oscin1')['luzifer/thinking']
 Rename CHOP, from → to:
 
 ```
-luzifer/listening luzifer/user_speaking luzifer/thinking luzifer/ai_speaking luzifer/play
-listening user thinking ai play
+luzifer/listening luzifer/user_speaking luzifer/stt luzifer/thinking luzifer/synthesizing luzifer/ai_speaking luzifer/play
+listening user stt thinking synth ai play
 ```
 
-Switch TOP index (one channel, Math or Expression CHOP):
-
-```python
-op('rename1')['user'] + op('rename1')['thinking']*2 + op('rename1')['ai']*3
-```
-
-`0` idle, `1` person, `2` thinking, `3` AI. Export the bool channels straight onto blends.
+Export the bool channels straight onto blends.
 
 `in_level` / `out_level` update at 30 Hz even when the value is `0`, so a late CHOP still fills in. Speech peaks are often under `0.3`; scale them in a Math CHOP. `out_level` is the dry file, starting at the `play` edge. After a VST, meter with an Analyze CHOP on the VST output.
 

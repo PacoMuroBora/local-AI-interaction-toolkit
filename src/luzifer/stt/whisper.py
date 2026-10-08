@@ -33,7 +33,12 @@ class WhisperEngine:
             )
             self._loaded_key = key
             self._mock = False
-            logger.info("Whisper model loaded: {}", settings.model_size)
+            logger.info(
+                "Whisper model loaded: {} device={} compute={}",
+                settings.model_size,
+                settings.device,
+                settings.compute_type,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Whisper unavailable ({}), using mock STT", exc)
             self._model = None
@@ -50,6 +55,11 @@ class WhisperEngine:
             audio.astype(np.float32),
             language=settings.language,
             vad_filter=False,
+            beam_size=1,
+            best_of=1,
+            patience=1.0,
+            without_timestamps=True,
+            condition_on_previous_text=False,
         )
         text = " ".join(seg.text.strip() for seg in segments).strip()
         return text

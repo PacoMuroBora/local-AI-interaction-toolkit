@@ -18,7 +18,7 @@ from luzifer.osc.td_client import TouchDesignerOscClient
 from luzifer.stt.whisper import WhisperEngine
 from luzifer.tts.kokoro import TtsEngine
 
-StateName = Literal["listening", "thinking", "speaking"]
+StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
 StateListener = Callable[[StateName, str, str], Awaitable[None] | None]
 CommandKind = Literal["say", "speak", "reset", "interrupt", "listen"]
 
@@ -78,8 +78,16 @@ class Pipeline:
         return self.is_listening()
 
     @property
+    def stt_active(self) -> bool:
+        return self.state == "stt"
+
+    @property
     def thinking(self) -> bool:
         return self.state == "thinking"
+
+    @property
+    def synthesizing(self) -> bool:
+        return self.state == "synthesizing"
 
     @property
     def ai_speaking(self) -> bool:
@@ -93,7 +101,9 @@ class Pipeline:
         await self.osc.send_flags(
             listening=listening,
             user_speaking=user_speaking and listening,
+            stt=self.state == "stt",
             thinking=self.state == "thinking",
+            synthesizing=self.state == "synthesizing",
             ai_speaking=self.state == "speaking",
         )
 
@@ -206,7 +216,9 @@ class Pipeline:
                 await self.osc.send_flags(
                     listening=False,
                     user_speaking=False,
+                    stt=False,
                     thinking=False,
+                    synthesizing=False,
                     ai_speaking=False,
                 )
                 await self.osc.send_levels(0.0, 0.0)
@@ -274,7 +286,7 @@ class Pipeline:
             await asyncio.sleep(0.05)
             return
 
-        await self.set_state("thinking")
+        await self.set_state("stt")
         user_text = (await self.stt.transcribe(audio, settings.stt)).strip()
         await self._run_cancellable(self._run_say_turn(user_text))
 
@@ -356,7 +368,7 @@ class Pipeline:
             return
 
         settings = await self.store.get()
-        await self.set_state("speaking")
+        await self.set_state("synthesizing")
         out_path = settings.resolve_output_path()
         try:
             duration, peak = await self.tts.synthesize(text, out_path, settings.tts)
@@ -370,6 +382,7 @@ class Pipeline:
 
         self.metrics.note_output_peak(peak)
         envelope = await asyncio.to_thread(peak_envelope, out_path, LEVEL_HZ)
+        await self.set_state("speaking")
         self.metrics.arm_output(envelope, 1.0 / LEVEL_HZ)
         await self.osc.send_play()
         pad = settings.audio.speaking_tail_pad_ms / 1000.0

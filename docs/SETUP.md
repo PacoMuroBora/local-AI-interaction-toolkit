@@ -72,6 +72,8 @@ Or use the dashboard Prompt / LLM tab (list + Pull). Change temperature / histor
 
 `faster-whisper` downloads the configured `stt.model_size` on first use, or via the Audio In tab Download buttons.
 
+On an NVIDIA GPU set `stt.device: cuda` and `stt.compute_type: float16` (dashboard Audio In). This uses **CTranslate2 CUDA**, not PyTorch — the CPU torch build is fine for Silero VAD. RTX 4080: `medium` + float16 is typically well under 2 GB VRAM and ~0.3s per short utterance. Lock `stt.language` (e.g. `en` / `de`) to skip language detection.
+
 ### Silero VAD (`--extra vad`)
 
 Loaded via `torch.hub` (`snakers4/silero-vad`) on first capture.
@@ -87,7 +89,7 @@ Download from the Audio Out tab into `models/` (gitignored), or place manually:
 
 ## TouchDesigner
 
-1. **OSC In CHOP** — port `9000`. Int channels: `luzifer/listening`, `luzifer/user_speaking`, `luzifer/thinking`, `luzifer/ai_speaking`, `luzifer/play`. Inactive flags are sent as `0`.
+1. **OSC In CHOP** — port `9000`. Int channels: `luzifer/listening`, `luzifer/user_speaking`, `luzifer/stt`, `luzifer/thinking`, `luzifer/synthesizing`, `luzifer/ai_speaking`, `luzifer/play`. Inactive flags are sent as `0`.
 2. **OSC In DAT** — same port if Windows delivers to both; strings (`state`, `user_text`, `ai_text`) only show up here.
 3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`.
 4. **Audio File In → Audio VST → Audio Device Out**, all Timeslice. File = `luzifer-backend\runtime\output\speech.wav` (overwritten each line). On `luzifer/play` off→on, reload, wait 1 frame, play. On on→off, stop. Leave **Monitor locally** off.

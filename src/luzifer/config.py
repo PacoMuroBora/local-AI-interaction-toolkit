@@ -25,10 +25,10 @@ class AudioSettings(BaseModel):
 
 
 class SttSettings(BaseModel):
-    model_size: str = "small"
-    compute_type: str = "int8"
+    model_size: str = "medium"
+    compute_type: str = "float16"
     language: str | None = None
-    device: str = "cpu"
+    device: str = "cuda"
 
 
 class LlmSettings(BaseModel):

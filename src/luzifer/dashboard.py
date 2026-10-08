@@ -73,8 +73,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .flag .dot { width:.55rem; height:.55rem; border-radius:50%; background:#3d444d; }
     .flag.on.mic { color:#3fb950; border-color:#23863666; background:#23863622; }
     .flag.on.mic .dot { background:#3fb950; box-shadow:0 0 8px #3fb950aa; }
+    .flag.on.stt { color:#a371f7; border-color:#8957e566; background:#8957e522; }
+    .flag.on.stt .dot { background:#a371f7; box-shadow:0 0 8px #a371f7aa; }
     .flag.on.think { color:#d29922; border-color:#9e6a0366; background:#9e6a0322; }
     .flag.on.think .dot { background:#d29922; box-shadow:0 0 8px #d29922aa; }
+    .flag.on.tts { color:#f778ba; border-color:#bf398966; background:#bf398922; }
+    .flag.on.tts .dot { background:#f778ba; box-shadow:0 0 8px #f778baaa; }
     .flag.on.speak { color:#79b8ff; border-color:#1f6feb66; background:#1f6feb22; }
     .flag.on.speak .dot { background:#79b8ff; box-shadow:0 0 8px #79b8ffaa; }
     .direct-play { display:inline-flex; align-items:center; gap:.55rem; margin-left:auto;
@@ -217,7 +221,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <h2>Live Transcript</h2>
       <div class="flags">
         <span id="flag-mic" class="flag mic"><span class="dot"></span>Mic</span>
+        <span id="flag-stt" class="flag stt"><span class="dot"></span>STT</span>
         <span id="flag-think" class="flag think"><span class="dot"></span>Thinking</span>
+        <span id="flag-tts" class="flag tts"><span class="dot"></span>TTS</span>
         <span id="flag-speak" class="flag speak"><span class="dot"></span>AI speaking</span>
       </div>
       <label class="direct-play" title="Play speech.wav on this machine (skip waiting on TD)">
@@ -497,10 +503,22 @@ function applyMetrics(m){
   }
 }
 
-function setActivityFlags(micOn, thinking, aiSpeaking){
-  document.getElementById("flag-mic").classList.toggle("on", !!micOn);
-  document.getElementById("flag-think").classList.toggle("on", !!thinking);
-  document.getElementById("flag-speak").classList.toggle("on", !!aiSpeaking);
+function setActivityFlags(flags){
+  document.getElementById("flag-mic").classList.toggle("on", !!flags.mic_on);
+  document.getElementById("flag-stt").classList.toggle("on", !!flags.stt);
+  document.getElementById("flag-think").classList.toggle("on", !!flags.thinking);
+  document.getElementById("flag-tts").classList.toggle("on", !!flags.synthesizing);
+  document.getElementById("flag-speak").classList.toggle("on", !!flags.ai_speaking);
+}
+
+function activityPayload(msg){
+  return {
+    mic_on: msg.mic_on,
+    stt: msg.stt,
+    thinking: msg.thinking,
+    synthesizing: msg.synthesizing,
+    ai_speaking: msg.ai_speaking,
+  };
 }
 
 function connectWs(){
@@ -510,16 +528,16 @@ function connectWs(){
     const msg = JSON.parse(ev.data);
     if (msg.type === "metrics") {
       applyMetrics(msg);
-      if ("mic_on" in msg || "thinking" in msg || "ai_speaking" in msg) {
-        setActivityFlags(msg.mic_on, msg.thinking, msg.ai_speaking);
+      if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
+        setActivityFlags(activityPayload(msg));
       }
       return;
     }
     if (msg.state) document.getElementById("state").textContent = msg.state;
     if ("user_text" in msg) document.getElementById("user_text").textContent = msg.user_text || "";
     if ("ai_text" in msg) document.getElementById("ai_text").textContent = msg.ai_text || "";
-    if ("mic_on" in msg || "thinking" in msg || "ai_speaking" in msg) {
-      setActivityFlags(msg.mic_on, msg.thinking, msg.ai_speaking);
+    if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
+      setActivityFlags(activityPayload(msg));
     }
     if (msg.type) {
       const pct = msg.progress == null ? "" : ` ${Math.round(msg.progress*100)}%`;
@@ -602,7 +620,9 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "user_text": user_text,
                 "ai_text": ai_text,
                 "mic_on": pipeline.mic_on,
+                "stt": pipeline.stt_active,
                 "thinking": pipeline.thinking,
+                "synthesizing": pipeline.synthesizing,
                 "ai_speaking": pipeline.ai_speaking,
             }
         )
@@ -630,7 +650,9 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 gpu_every += 1
                 payload = pipeline.metrics.snapshot()
                 payload["mic_on"] = pipeline.mic_on
+                payload["stt"] = pipeline.stt_active
                 payload["thinking"] = pipeline.thinking
+                payload["synthesizing"] = pipeline.synthesizing
                 payload["ai_speaking"] = pipeline.ai_speaking
                 payload["state"] = pipeline.state
                 await hub.broadcast(payload)
@@ -765,7 +787,9 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "user_text": pipeline.last_user_text,
                     "ai_text": pipeline.last_ai_text,
                     "mic_on": pipeline.mic_on,
+                    "stt": pipeline.stt_active,
                     "thinking": pipeline.thinking,
+                    "synthesizing": pipeline.synthesizing,
                     "ai_speaking": pipeline.ai_speaking,
                 }
             )

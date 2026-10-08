@@ -9,13 +9,15 @@ alwaysApply: true
 
 | Address | Type | Values |
 |---------|------|--------|
-| `/luzifer/state` | string | `listening`, `thinking`, `speaking` (DAT only) |
+| `/luzifer/state` | string | `listening`, `stt`, `thinking`, `synthesizing`, `speaking` (DAT only) |
 | `/luzifer/user_text` | string | visitor transcript |
 | `/luzifer/ai_text` | string | LLM reply |
 | `/luzifer/listening` | int | `1` / `0` |
 | `/luzifer/user_speaking` | int | `1` while VAD hears the visitor, else `0` |
-| `/luzifer/thinking` | int | `1` / `0` |
-| `/luzifer/ai_speaking` | int | `1` / `0` |
+| `/luzifer/stt` | int | `1` while Whisper runs |
+| `/luzifer/thinking` | int | `1` while the LLM runs |
+| `/luzifer/synthesizing` | int | `1` while TTS writes the wav |
+| `/luzifer/ai_speaking` | int | `1` during playback + tail |
 | `/luzifer/play` | int | `1` after `speech.wav` is written, then `0` when speaking ends |
 | `/luzifer/in_level` | float | mic peak, 30 Hz, else `0` |
 | `/luzifer/out_level` | float | dry-wav envelope from the `play` edge, 30 Hz, else `0` |
@@ -33,6 +35,6 @@ Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inact
 | `/luzifer/in/listen` | int | `1` unmute / `0` mute mic |
 
 - WAV path: `runtime/output/speech.wav` (reload on `/luzifer/play`).
-- Mic / VAD stream MUST stop whenever `state != "listening"` (covers `thinking` and `speaking` anti-feedback).
+- Mic / VAD stream MUST stop whenever `state != "listening"` (covers `stt`, `thinking`, `synthesizing`, `speaking` anti-feedback).
 - Do not invent new `/luzifer/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
 - Send OSC via `TouchDesignerOscClient`; receive via `TouchDesignerOscServer`. No raw socket one-offs in the pipeline.

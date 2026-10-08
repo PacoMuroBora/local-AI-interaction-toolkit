@@ -25,9 +25,9 @@ audio:
   speaking_tail_pad_ms: 50
 stt:
   model_size: medium
-  compute_type: int8
+  compute_type: float16
   language: null
-  device: cpu
+  device: cuda
 llm:
   base_url: http://127.0.0.1:11434
   model: qwen2.5:14b
