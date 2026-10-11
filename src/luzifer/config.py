@@ -104,11 +104,13 @@ class VisionSettings(BaseModel):
     change_threshold: float = 4.0
     max_age_s: float = 30.0
     model: str = "moondream"
+    # Keep this concrete — vague "notes only" prompts make moondream emit "!!!".
     prompt: str = (
-        "Factual notes only, one or two short sentences, English. "
-        "People, motion, objects, light. No mood, no story."
+        "Describe the scene in one or two short factual English sentences. "
+        "Mention people (approx age/gender if clear), pose, clothing, objects, "
+        "and background. No poetry, no mood, no questions."
     )
-    num_predict: int = 80
+    num_predict: int = 120
     inject_context: bool = True
     store_in_history: bool = False
 

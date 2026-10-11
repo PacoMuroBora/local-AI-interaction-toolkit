@@ -75,18 +75,19 @@ dashboard:
   host: 127.0.0.1
   port: 8501
 vision:
-  enabled: true
+  enabled: false
   ndi_source: LuziferCam
   trigger: local_idle
-  interval_s: 4.0
+  interval_s: 10.0
   idle_after_s: 12.0
   speak_cooldown_s: 25.0
-  jpeg_max_edge: 512
+  jpeg_max_edge: 768
   change_threshold: 4.0
   max_age_s: 30.0
-  model: moondream
-  prompt: Factual notes only, one or two short sentences, English. People, motion,
-    objects, light. No mood, no story.
-  num_predict: 80
+  model: qwen2.5vl:3b
+  prompt: Describe the scene in one or two short factual English sentences. Mention
+    people (approx age/gender if clear), pose, clothing, objects, and background.
+    No poetry, no mood, no questions.
+  num_predict: 120
   inject_context: true
   store_in_history: false

@@ -33,6 +33,17 @@ class TouchDesignerOscServer:
 
     def _dispatch(self, address: str, *args: Any) -> None:
         value: Any = args[0] if args else None
+        # TD often streams /luzifer/in/vision 0 every frame — drop before scheduling.
+        if address == ADDR_VISION:
+            fire = True
+            if isinstance(value, (int, float)):
+                fire = bool(int(value))
+            elif isinstance(value, str):
+                fire = value.strip() not in {"0", "false", "False", ""}
+            elif value is None:
+                fire = False
+            if not fire:
+                return
         loop = self._loop
         if loop is None:
             return

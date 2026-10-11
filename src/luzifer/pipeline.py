@@ -22,7 +22,7 @@ from luzifer.tts.kokoro import TtsEngine
 from luzifer.vision.frames import frame_changed, jpeg_bytes, mean_abs_diff
 from luzifer.vision.ndi import NdiGrabber
 from luzifer.vision.observation import ObservationStore
-from luzifer.vision.ollama import VisionOllama
+from luzifer.vision.ollama import VisionOllama, is_usable_caption
 
 StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
 StateListener = Callable[[StateName, str, str], Awaitable[None] | None]
@@ -138,18 +138,31 @@ class Pipeline:
         self._user_speaking = False
         self._last_activity_at = time.monotonic()
         self._last_vision_speak_at = 0.0
+        self._last_vision_attempt_at = 0.0
         self._prev_small: np.ndarray | None = None
         self._vision_busy = False
         self._caption_lock = asyncio.Lock()
+        self._vision_listeners: list[Callable[[], Awaitable[None] | None]] = []
 
     def on_state(self, listener: StateListener) -> None:
         self._listeners.append(listener)
+
+    def on_vision(self, listener: Callable[[], Awaitable[None] | None]) -> None:
+        self._vision_listeners.append(listener)
 
     async def _notify(self) -> None:
         for listener in list(self._listeners):
             result = listener(self.state, self.last_user_text, self.last_ai_text)
             if asyncio.iscoroutine(result):
                 await result
+
+    async def _notify_vision(self) -> None:
+        for listener in list(self._vision_listeners):
+            result = listener()
+            if asyncio.iscoroutine(result):
+                await result
+        # Also push full state so dashboard flags stay in sync
+        await self._notify()
 
     @property
     def mic_on(self) -> bool:
@@ -170,6 +183,14 @@ class Pipeline:
     @property
     def ai_speaking(self) -> bool:
         return self.state == "speaking"
+
+    @property
+    def vision_analyzing(self) -> bool:
+        return self._vision_busy
+
+    @property
+    def vision_ready(self) -> bool:
+        return not self._vision_busy
 
     def is_listening(self) -> bool:
         return self._running and self.state == "listening" and self._mic_enabled
@@ -225,13 +246,25 @@ class Pipeline:
     async def set_listen(self, enabled: bool) -> None:
         await self.enqueue(PipelineCommand(kind="listen", enabled=enabled))
 
-    async def analyze_vision(self) -> None:
-        """Dashboard: caption only (force)."""
-        await self.enqueue(PipelineCommand(kind="vision", comment=False, force=True))
+    async def analyze_vision(self) -> str:
+        """Dashboard CTA: caption now. Does not touch the mic."""
+        settings = await self.store.get()
+        logger.info("Vision analyze CTA (source={!r})", settings.vision.ndi_source)
+        return await self._caption_frame(settings.vision, force=True) or ""
 
-    async def comment_vision(self) -> None:
-        """Dashboard: caption + spoken reaction (force)."""
-        await self.enqueue(PipelineCommand(kind="vision", comment=True, force=True))
+    async def comment_vision(self) -> str:
+        """Dashboard CTA: caption + spoken reaction. Returns caption."""
+        settings = await self.store.get()
+        logger.info("Vision comment CTA (source={!r})", settings.vision.ndi_source)
+        text = await self._caption_frame(settings.vision, force=True) or ""
+        if not text:
+            return ""
+        # Wake mic loop so the speak turn can start promptly
+        self.vad.stop_stream()
+        await self.enqueue(
+            PipelineCommand(kind="vision", comment=True, force=True, text=text)
+        )
+        return text
 
     async def request_vision_from_osc(self) -> None:
         """TD pulse: analyze + comment when trigger=external."""
@@ -242,6 +275,7 @@ class Pipeline:
         if settings.vision.trigger != "external":
             logger.info("OSC vision ignored (trigger={})", settings.vision.trigger)
             return
+        self.vad.stop_stream()
         await self.enqueue(PipelineCommand(kind="vision", comment=True, force=True))
 
     def _trim_history(self, max_turns: int) -> None:
@@ -398,6 +432,16 @@ class Pipeline:
                 return
             return
 
+        # Capture won — still drain any command that landed while we cancelled the waiter
+        while not self._commands.empty():
+            cmd = self._commands.get_nowait()
+            self.vad.stop_stream()
+            handled = await self._handle_control(cmd)
+            if handled == "turn":
+                return
+            if handled == "consume":
+                continue
+
         audio = capture_task.result()
         if audio is None or not self._running:
             await asyncio.sleep(0.05)
@@ -441,7 +485,11 @@ class Pipeline:
             return "turn"
         if cmd.kind == "vision":
             await self._run_cancellable(
-                self._handle_vision_command(comment=cmd.comment, force=cmd.force)
+                self._handle_vision_command(
+                    comment=cmd.comment,
+                    force=cmd.force,
+                    caption=cmd.text or None,
+                )
             )
             return "turn"
         return "none"
@@ -552,7 +600,13 @@ class Pipeline:
             return True
         return (time.monotonic() - self._last_vision_speak_at) >= settings.speak_cooldown_s
 
-    async def _handle_vision_command(self, *, comment: bool, force: bool) -> None:
+    async def _handle_vision_command(
+        self,
+        *,
+        comment: bool,
+        force: bool,
+        caption: str | None = None,
+    ) -> None:
         settings = await self.store.get()
         if not settings.vision.enabled and not force:
             await self.set_state("listening")
@@ -561,25 +615,32 @@ class Pipeline:
             if not self._idle_eligible(settings.vision) or not self._vision_cooldown_ok(settings.vision):
                 await self.set_state("listening")
                 return
-        caption = await self._caption_frame(settings.vision, force=force)
+        # Pre-captioned CTAs pass text=; OSC / idle path captions here
         if not caption:
-            await self.set_state("listening")
+            caption = await self._caption_frame(settings.vision, force=force)
+        if not caption:
+            logger.info("Vision command: no caption")
+            # Don't bounce state/mic when already listening
+            if self.state != "listening":
+                await self.set_state("listening")
             return
         if comment:
             await self._run_vision_turn(caption, force=force)
         else:
-            await self.set_state("listening")
+            if self.state != "listening":
+                await self.set_state("listening")
 
     async def _caption_frame(self, vision: VisionSettings, *, force: bool) -> str | None:
-        """Grab NDI still → VLM caption. Returns caption text or None."""
-        if self._vision_busy:
-            logger.debug("Vision caption skipped (busy)")
-            return None
+        """Grab NDI still → VLM caption. Returns caption text or None.
+
+        Waits for the caption lock (CTAs never get a busy-reject). Idle path
+        skips the VLM when the frame is unchanged.
+        """
         async with self._caption_lock:
-            if self._vision_busy:
-                return None
             self._vision_busy = True
+            self._last_vision_attempt_at = time.monotonic()
             await self.osc.send_vision_active(True)
+            await self._notify_vision()
             try:
                 settings = await self.store.get()
                 rgb = await asyncio.to_thread(self._ndi.latest_rgb, vision.ndi_source)
@@ -596,7 +657,7 @@ class Pipeline:
                 self._prev_small = small
 
                 if not force and not changed:
-                    logger.debug("Vision frame unchanged (mae={:.2f}), skip speak", mae)
+                    logger.info("Vision frame unchanged (mae={:.2f}), skip VLM", mae)
                     return None
 
                 jpeg = await asyncio.to_thread(
@@ -607,7 +668,12 @@ class Pipeline:
                     vision,
                     base_url=settings.llm.base_url,
                 )
-                if not text:
+                if not text or not is_usable_caption(text):
+                    logger.info(
+                        "Vision VLM unusable (model={!r}): {!r}",
+                        vision.model,
+                        (text or "")[:80],
+                    )
                     return None
 
                 self.observations.update(text, mae=mae)
@@ -625,6 +691,7 @@ class Pipeline:
                     await self.osc.send_vision_active(False)
                 except Exception:  # noqa: BLE001
                     pass
+                await self._notify_vision()
 
     async def _run_vision_turn(self, observation: str, *, force: bool) -> None:
         settings = await self.store.get()
@@ -635,13 +702,18 @@ class Pipeline:
                 return
 
         user = (
-            "[visual observation]\n"
+            "[visual observation — camera facts, not a visitor speaking]\n"
             f"{observation}\n\n"
-            "React in character in one or two spoken sentences. "
-            "If nothing is worth saying, reply with exactly SILENT."
+            "In character, speak 1–2 short sentences that clearly react to those facts "
+            "(what you see / who is there). Use real words. "
+            "Do not answer with punctuation, emojis, or filler alone. "
+            "If the scene is empty or not worth a line, reply with exactly SILENT."
         )
         system = settings.system_prompt + language_system_suffix(self.last_language)
-        system += "\n\nA [visual observation] is the camera, not a person."
+        system += (
+            "\n\nA [visual observation] is what the camera sees right now. "
+            "Treat it as ground truth; do not invent people or objects beyond it."
+        )
 
         await self.set_state("thinking")
         history = list(self._history) if settings.llm.history_turns > 0 else []
@@ -656,8 +728,8 @@ class Pipeline:
             return
 
         stripped = ai_text.strip()
-        if stripped.upper() == "SILENT" or not stripped:
-            logger.info("Vision turn silent")
+        if stripped.upper() == "SILENT" or not stripped or not is_usable_caption(stripped):
+            logger.info("Vision turn silent/junk: {!r}", stripped[:60])
             await self.set_state("listening")
             return
 
@@ -674,7 +746,10 @@ class Pipeline:
         await self._speak_text(stripped)
 
     async def _vision_loop(self) -> None:
-        """Local-idle sampler. External trigger only keeps NDI warm via forced commands."""
+        """Local-idle sampler: caption in-background (no mic tear-down).
+
+        Only enqueues a speak turn when a new caption is worth saying.
+        """
         while True:
             try:
                 settings = await self.store.get()
@@ -683,7 +758,7 @@ class Pipeline:
                     await asyncio.sleep(0.5)
                     continue
 
-                if self._vision_busy or self.state != "listening":
+                if self.state != "listening" or self._user_speaking:
                     await asyncio.sleep(0.25)
                     continue
 
@@ -691,19 +766,28 @@ class Pipeline:
                     await asyncio.sleep(0.5)
                     continue
 
+                # Pace attempts by interval (even when frame unchanged / VLM fails)
+                since_attempt = time.monotonic() - self._last_vision_attempt_at
+                if since_attempt < max(0.5, vision.interval_s):
+                    await asyncio.sleep(0.25)
+                    continue
+
                 if not self._vision_cooldown_ok(vision):
                     await asyncio.sleep(0.5)
                     continue
 
-                # Don't stack idle vision turns behind in-flight work
-                if not self._commands.empty() or self._active_task is not None:
+                if self._active_task is not None or not self._commands.empty():
                     await asyncio.sleep(0.5)
                     continue
 
-                await self.enqueue(
-                    PipelineCommand(kind="vision", comment=True, force=False)
-                )
-                await asyncio.sleep(max(0.5, vision.interval_s))
+                # Caption without going through the command queue (keeps mic open)
+                text = await self._caption_frame(vision, force=False)
+                if text and self.state == "listening" and self._vision_cooldown_ok(vision):
+                    self.vad.stop_stream()
+                    await self.enqueue(
+                        PipelineCommand(kind="vision", comment=True, force=True, text=text)
+                    )
+                await asyncio.sleep(0.25)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001

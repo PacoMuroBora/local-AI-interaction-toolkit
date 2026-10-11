@@ -54,6 +54,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .lang-card .hint { margin:0 0 .55rem; font-size:.72rem; color:#6e7681; }
     .hint { margin:.35rem 0 .55rem; font-size:.72rem; color:#6e7681; }
     .hint code { font-size:.7rem; }
+    .vision-result {
+      margin-top:.35rem; min-height:10rem; padding:.75rem .85rem;
+      background:#0f1115; border:1px solid #2a2f3a; border-radius:8px;
+      color:#e8eaed; font-size:.9rem; line-height:1.45; white-space:pre-wrap;
+    }
+    .vision-result.empty { color:#6e7681; }
     h2 { margin:0 0 .75rem; font-size:1rem; color:#9aa0a6; text-transform:uppercase; letter-spacing:.04em; }
     label { display:block; font-size:.8rem; color:#9aa0a6; margin:.55rem 0 .2rem; }
     input, textarea, select { width:100%; box-sizing:border-box; background:#0f1115; color:#e8eaed;
@@ -89,6 +95,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .flag.on.tts .dot { background:#f778ba; box-shadow:0 0 8px #f778baaa; }
     .flag.on.speak { color:#79b8ff; border-color:#1f6feb66; background:#1f6feb22; }
     .flag.on.speak .dot { background:#79b8ff; box-shadow:0 0 8px #79b8ffaa; }
+    .flag.on.vision-ready { color:#3fb950; border-color:#23863666; background:#23863622; }
+    .flag.on.vision-ready .dot { background:#3fb950; box-shadow:0 0 8px #3fb950aa; }
+    .flag.on.vision-analyzing { color:#d29922; border-color:#9e6a0366; background:#9e6a0322; }
+    .flag.on.vision-analyzing .dot { background:#d29922; box-shadow:0 0 8px #d29922aa; }
     .direct-play { display:inline-flex; align-items:center; gap:.55rem; margin-left:auto;
       color:#9aa0a6; font-size:.8rem; font-weight:600; cursor:pointer; user-select:none; }
     .direct-play input { position:absolute; opacity:0; width:0; height:0; }
@@ -300,7 +310,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Ollama VLM</label><input id="vision.model" placeholder="moondream" />
           <label>JPEG Max Edge</label><input id="vision.jpeg_max_edge" type="number" step="32" />
           <label>Num Predict</label><input id="vision.num_predict" type="number" step="1" />
-          <label>Caption Prompt</label><textarea id="vision.prompt" rows="4"></textarea>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
             <input id="vision.inject_context" type="checkbox" style="width:auto" />
             Inject latest caption into next visitor turn
@@ -313,8 +322,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="row">
             <button id="vision_analyze" type="button">Analyze</button>
             <button id="vision_comment" type="button">Analyze + Comment</button>
+            <span id="flag-vision-ready" class="flag vision-ready on"><span class="dot"></span>Ready</span>
+            <span id="flag-vision-analyzing" class="flag vision-analyzing"><span class="dot"></span>Analyzing</span>
           </div>
-          <p class="hint">Buttons always work (force). They queue behind an in-progress turn.</p>
+          <p class="hint">Buttons force a grab now (ignore trigger / idle). Comment also speaks.</p>
+        </div>
+      </div>
+      <div class="grid" style="margin-top:1rem">
+        <div>
+          <h2>Caption Prompt</h2>
+          <textarea id="vision.prompt" rows="8" style="min-height:10rem"></textarea>
+        </div>
+        <div>
+          <h2>Analysis Result</h2>
+          <div id="vision_result" class="vision-result">No analysis yet.</div>
         </div>
       </div>
     </section>
@@ -695,10 +716,36 @@ document.getElementById("reset").onclick = async () => {
   await fetch("/api/session/reset", {method:"POST"});
   setStatus("session reset");
 };
+function setVisionResult(text){
+  const el = document.getElementById("vision_result");
+  const footer = document.getElementById("vision_text");
+  const t = (text || "").trim();
+  if (el) {
+    el.textContent = t || "No analysis yet.";
+    el.classList.toggle("empty", !t);
+  }
+  if (footer) footer.textContent = t;
+}
+
 async function queueVision(kind){
   const path = kind === "comment" ? "/api/vision/comment" : "/api/vision/analyze";
-  await fetch(path, {method:"POST"});
-  setStatus(kind === "comment" ? "vision comment queued" : "vision analyze queued");
+  setStatus(kind === "comment" ? "vision: caption + comment…" : "vision: analyzing…");
+  try {
+    const res = await fetch(path, {method:"POST"});
+    const data = await res.json();
+    if (!res.ok) {
+      setStatus("vision failed");
+      return;
+    }
+    setVisionResult(data.vision_text || "");
+    setStatus(
+      data.vision_text
+        ? (kind === "comment" ? "vision comment running" : "vision analyzed")
+        : "vision: no caption (check NDI source / moondream)"
+    );
+  } catch (e) {
+    setStatus("vision request failed");
+  }
 }
 document.getElementById("vision_analyze").onclick = () => queueVision("analyze");
 document.getElementById("vision_comment").onclick = () => queueVision("comment");
@@ -740,6 +787,20 @@ function setActivityFlags(flags){
   document.getElementById("flag-think").classList.toggle("on", !!flags.thinking);
   document.getElementById("flag-tts").classList.toggle("on", !!flags.synthesizing);
   document.getElementById("flag-speak").classList.toggle("on", !!flags.ai_speaking);
+  setVisionFlags(flags);
+}
+
+function setVisionFlags(flags){
+  const analyzing = !!flags.vision_analyzing;
+  const ready = ("vision_ready" in flags) ? !!flags.vision_ready : !analyzing;
+  const readyEl = document.getElementById("flag-vision-ready");
+  const analEl = document.getElementById("flag-vision-analyzing");
+  if (readyEl) readyEl.classList.toggle("on", ready && !analyzing);
+  if (analEl) analEl.classList.toggle("on", analyzing);
+  const analyzeBtn = document.getElementById("vision_analyze");
+  const commentBtn = document.getElementById("vision_comment");
+  if (analyzeBtn) analyzeBtn.disabled = analyzing;
+  if (commentBtn) commentBtn.disabled = analyzing;
 }
 
 function activityPayload(msg){
@@ -749,6 +810,8 @@ function activityPayload(msg){
     thinking: msg.thinking,
     synthesizing: msg.synthesizing,
     ai_speaking: msg.ai_speaking,
+    vision_analyzing: msg.vision_analyzing,
+    vision_ready: msg.vision_ready,
   };
 }
 
@@ -759,7 +822,9 @@ function connectWs(){
     const msg = JSON.parse(ev.data);
     if (msg.type === "metrics") {
       applyMetrics(msg);
-      if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
+      if ("vision_text" in msg) setVisionResult(msg.vision_text || "");
+      if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg
+          || "vision_analyzing" in msg) {
         setActivityFlags(activityPayload(msg));
       }
       return;
@@ -771,7 +836,8 @@ function connectWs(){
       document.getElementById("user_lang").textContent = lang ? `[${lang}]` : "";
     }
     if ("ai_text" in msg) document.getElementById("ai_text").textContent = msg.ai_text || "";
-    if ("vision_text" in msg) document.getElementById("vision_text").textContent = msg.vision_text || "";
+    if ("vision_text" in msg) setVisionResult(msg.vision_text || "");
+    if ("vision_analyzing" in msg || "vision_ready" in msg) setVisionFlags(msg);
     if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
       setActivityFlags(activityPayload(msg));
     }
@@ -862,10 +928,22 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "thinking": pipeline.thinking,
                 "synthesizing": pipeline.synthesizing,
                 "ai_speaking": pipeline.ai_speaking,
+                "vision_analyzing": pipeline.vision_analyzing,
+                "vision_ready": pipeline.vision_ready,
+            }
+        )
+
+    async def _on_vision() -> None:
+        await hub.broadcast(
+            {
+                "vision_text": pipeline.observations.text,
+                "vision_analyzing": pipeline.vision_analyzing,
+                "vision_ready": pipeline.vision_ready,
             }
         )
 
     pipeline.on_state(_on_state)
+    pipeline.on_vision(_on_vision)
 
     def _track(task: asyncio.Task[Any]) -> None:
         app.state.bg_tasks.add(task)
@@ -892,6 +970,9 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 payload["thinking"] = pipeline.thinking
                 payload["synthesizing"] = pipeline.synthesizing
                 payload["ai_speaking"] = pipeline.ai_speaking
+                payload["vision_analyzing"] = pipeline.vision_analyzing
+                payload["vision_ready"] = pipeline.vision_ready
+                payload["vision_text"] = pipeline.observations.text
                 payload["state"] = pipeline.state
                 await hub.broadcast(payload)
                 await asyncio.sleep(0.5)
@@ -1023,13 +1104,13 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
 
     @app.post("/api/vision/analyze")
     async def vision_analyze() -> dict[str, str]:
-        await pipeline.analyze_vision()
-        return {"status": "queued"}
+        text = await pipeline.analyze_vision()
+        return {"status": "ok" if text else "empty", "vision_text": text}
 
     @app.post("/api/vision/comment")
     async def vision_comment() -> dict[str, str]:
-        await pipeline.comment_vision()
-        return {"status": "queued"}
+        text = await pipeline.comment_vision()
+        return {"status": "ok" if text else "empty", "vision_text": text}
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
@@ -1047,6 +1128,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "thinking": pipeline.thinking,
                     "synthesizing": pipeline.synthesizing,
                     "ai_speaking": pipeline.ai_speaking,
+                    "vision_analyzing": pipeline.vision_analyzing,
+                    "vision_ready": pipeline.vision_ready,
                 }
             )
         )
@@ -1061,18 +1144,21 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
 
 def _make_osc_handler(pipeline: Pipeline):
     async def _on_command(address: str, value: Any) -> None:
-        logger.info("OSC in {} {!r}", address, value)
         if address == ADDR_SAY:
             text = str(value or "").strip()
             if text:
+                logger.info("OSC in {} {!r}", address, text)
                 await pipeline.say(text)
         elif address == ADDR_SPEAK:
             text = str(value or "").strip()
             if text:
+                logger.info("OSC in {} {!r}", address, text)
                 await pipeline.speak(text)
         elif address == ADDR_RESET:
+            logger.info("OSC in {}", address)
             await pipeline.reset_session()
         elif address == ADDR_INTERRUPT:
+            logger.info("OSC in {}", address)
             await pipeline.interrupt()
         elif address == ADDR_LISTEN:
             enabled = True
@@ -1080,15 +1166,12 @@ def _make_osc_handler(pipeline: Pipeline):
                 enabled = bool(int(value))
             elif isinstance(value, str):
                 enabled = value.strip() not in {"0", "false", "False", ""}
+            logger.info("OSC in {} {}", address, int(enabled))
             await pipeline.set_listen(enabled)
         elif address == ADDR_VISION:
-            fire = True
-            if isinstance(value, (int, float)):
-                fire = bool(int(value))
-            elif isinstance(value, str):
-                fire = value.strip() not in {"0", "false", "False", ""}
-            if fire:
-                await pipeline.request_vision_from_osc()
+            # Zeros already filtered in td_server._dispatch
+            logger.info("OSC in {} → vision comment", address)
+            await pipeline.request_vision_from_osc()
 
     return _on_command
 

@@ -3,15 +3,31 @@
 from __future__ import annotations
 
 import base64
+import re
 
 import httpx
 from loguru import logger
 
 from luzifer.config import VisionSettings
 
+# Moondream often emits punctuation-only / emoji junk on vague prompts.
+_JUNK = re.compile(r"^[\s.!?;:,\-_/\\|@#$%^&*()+=\[\]{}'\"`~<>]+$")
+_WORD = re.compile(r"[A-Za-zÀ-ÿ]{2,}")
+
+
+def is_usable_caption(text: str) -> bool:
+    t = (text or "").strip()
+    if len(t) < 8:
+        return False
+    if _JUNK.match(t):
+        return False
+    if len(_WORD.findall(t)) < 2:
+        return False
+    return True
+
 
 class VisionOllama:
-    """POST /api/chat with images[] for a small local VLM."""
+    """POST /api/chat (fallback /api/generate) with images for a small local VLM."""
 
     def __init__(self) -> None:
         self._client: httpx.AsyncClient | None = None
@@ -39,28 +55,58 @@ class VisionOllama:
     ) -> str:
         client = await self._get_client(base_url)
         b64 = base64.b64encode(jpeg).decode("ascii")
-        payload = {
-            "model": settings.model,
-            "stream": False,
-            "keep_alive": "30m",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": settings.prompt,
-                    "images": [b64],
-                }
-            ],
-            "options": {
-                "temperature": 0.2,
-                "num_predict": settings.num_predict,
-            },
+        prompt = (settings.prompt or "").strip() or (
+            "Describe the scene in one or two short factual English sentences. "
+            "Name people, pose, clothing, objects, and background. No poetry."
+        )
+        options = {
+            "temperature": 0.1,
+            "num_predict": max(32, int(settings.num_predict)),
         }
+
+        # 1) chat API
         try:
-            response = await client.post("/api/chat", json=payload)
+            response = await client.post(
+                "/api/chat",
+                json={
+                    "model": settings.model,
+                    "stream": False,
+                    "keep_alive": "30m",
+                    "messages": [
+                        {"role": "user", "content": prompt, "images": [b64]},
+                    ],
+                    "options": options,
+                },
+            )
             response.raise_for_status()
             data = response.json()
-            content = data.get("message", {}).get("content", "")
-            return str(content).strip()
+            content = str(data.get("message", {}).get("content", "") or "").strip()
+            if is_usable_caption(content):
+                return content
+            logger.warning("Vision chat junk/empty: {!r}", content[:80])
         except Exception as exc:  # noqa: BLE001
-            logger.error("Vision caption failed: {}", exc)
-            return ""
+            logger.error("Vision /api/chat failed: {}", exc)
+
+        # 2) generate API (moondream is often happier here)
+        try:
+            response = await client.post(
+                "/api/generate",
+                json={
+                    "model": settings.model,
+                    "stream": False,
+                    "keep_alive": "30m",
+                    "prompt": prompt,
+                    "images": [b64],
+                    "options": options,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = str(data.get("response", "") or "").strip()
+            if is_usable_caption(content):
+                return content
+            logger.warning("Vision generate junk/empty: {!r}", content[:80])
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Vision /api/generate failed: {}", exc)
+
+        return ""
