@@ -72,18 +72,60 @@ KOKORO_FILES = {
     "voices-v1.0.bin": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
 }
 
+_PIPER_HF = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+
+
+def _piper_urls(lang_path: str, speaker: str, quality: str, voice: str) -> dict[str, str]:
+    base = f"{_PIPER_HF}/{lang_path}/{speaker}/{quality}/{voice}"
+    return {"onnx": f"{base}.onnx", "json": f"{base}.onnx.json"}
+
+
 PIPER_VOICES = {
+    # English
     "en_US-lessac-medium": {
-        "onnx": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
-        "json": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
+        **_piper_urls("en/en_US", "lessac", "medium", "en_US-lessac-medium"),
+        "label": "EN · Lessac (M, medium)",
     },
     "en_GB-alan-medium": {
-        "onnx": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx",
-        "json": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json",
+        **_piper_urls("en/en_GB", "alan", "medium", "en_GB-alan-medium"),
+        "label": "EN · Alan (M, medium)",
+    },
+    # German — https://rhasspy.github.io/piper-samples/
+    "de_DE-thorsten-high": {
+        **_piper_urls("de/de_DE", "thorsten", "high", "de_DE-thorsten-high"),
+        "label": "DE · Thorsten (M, high)",
     },
     "de_DE-thorsten-medium": {
-        "onnx": "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx",
-        "json": "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json",
+        **_piper_urls("de/de_DE", "thorsten", "medium", "de_DE-thorsten-medium"),
+        "label": "DE · Thorsten (M, medium)",
+    },
+    "de_DE-thorsten-low": {
+        **_piper_urls("de/de_DE", "thorsten", "low", "de_DE-thorsten-low"),
+        "label": "DE · Thorsten (M, low)",
+    },
+    "de_DE-thorsten_emotional-medium": {
+        **_piper_urls("de/de_DE", "thorsten_emotional", "medium", "de_DE-thorsten_emotional-medium"),
+        "label": "DE · Thorsten Emotional (M, medium)",
+    },
+    "de_DE-pavoque-low": {
+        **_piper_urls("de/de_DE", "pavoque", "low", "de_DE-pavoque-low"),
+        "label": "DE · Pavoque (M, low)",
+    },
+    "de_DE-karlsson-low": {
+        **_piper_urls("de/de_DE", "karlsson", "low", "de_DE-karlsson-low"),
+        "label": "DE · Karlsson (M, low)",
+    },
+    "de_DE-eva_k-x_low": {
+        **_piper_urls("de/de_DE", "eva_k", "x_low", "de_DE-eva_k-x_low"),
+        "label": "DE · Eva K (F, x_low)",
+    },
+    "de_DE-kerstin-low": {
+        **_piper_urls("de/de_DE", "kerstin", "low", "de_DE-kerstin-low"),
+        "label": "DE · Kerstin (F, low)",
+    },
+    "de_DE-ramona-low": {
+        **_piper_urls("de/de_DE", "ramona", "low", "de_DE-ramona-low"),
+        "label": "DE · Ramona (F, low)",
     },
 }
 
@@ -218,13 +260,14 @@ def list_tts_models() -> dict[str, Any]:
         path = md / filename
         kokoro_files.append({"id": filename, "path": str(path), "downloaded": path.exists()})
     piper = []
-    for voice, urls in PIPER_VOICES.items():
+    for voice, meta_urls in PIPER_VOICES.items():
         onnx = md / f"{voice}.onnx"
         meta = md / f"{voice}.onnx.json"
         piper.append(
             {
                 "id": f"piper:{voice}",
                 "voice": voice,
+                "label": meta_urls.get("label") or voice,
                 "downloaded": onnx.exists() and meta.exists(),
                 "onnx": str(onnx),
                 "json": str(meta),

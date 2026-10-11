@@ -76,10 +76,13 @@ On an NVIDIA GPU set `stt.device: cuda` and `stt.compute_type: float16` (dashboa
 
 ### Bilingual TTS (DE/EN)
 
-With `tts.match_input_language: true` (default), each turn uses Whisper’s language from **that utterance only** — never an average over chat history. That picks:
+With `tts.match_input_language: true` (default), each turn uses Whisper’s language from **that utterance only** — never an average over chat history. Dashboard **Audio Out** has EN / DE columns for engine + voice.
 
-- Kokoro `lang` via `tts.lang_by_lang` (`en` → `en-us`, `de` → `de`)
-- Voice via `tts.voice_by_lang` (same speaker for both is fine with Kokoro; for Piper use `en_US-lessac-medium` / `de_DE-thorsten-medium`)
+- Same engine (both Kokoro): cheapest — one ONNX graph; voice switch is a style-vector lookup. DE via `lang=de` is accented.
+- Mixed (Kokoro EN + Piper DE): best DE quality. Both stay preloaded; RAM cost is ~one Kokoro session + one Piper model. Fine on a 4080-class box.
+- Two Piper voices: two ONNX models cached; still cheap vs LLM/Whisper.
+
+Recommended install: EN `kokoro`/`am_onyx`, DE `piper`/`de_DE-thorsten-high` (or `pavoque` for a darker tone). Download from Audio Out → TTS Assets.
 
 The LLM also gets a one-shot “reply in German/English this turn” suffix that is **not** written into history.
 

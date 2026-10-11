@@ -51,10 +51,17 @@ class TtsSettings(BaseModel):
     output_path: str = "runtime/output/speech.wav"
     output_device_id: int | None = None
     monitor_local: bool = False
-    # Match TTS voice/lang to the *last* STT utterance language only (not history).
+    # Match TTS engine/voice/lang to the *last* STT utterance only (not history).
     match_input_language: bool = True
     # Kokoro espeak lang for the active synth call (overridden per turn when matching).
     lang: str = "en-us"
+    # ISO 639-1 → engine ("kokoro" | "piper").
+    engine_by_lang: dict[str, str] = Field(
+        default_factory=lambda: {
+            "en": "kokoro",
+            "de": "kokoro",
+        }
+    )
     # ISO 639-1 → Kokoro voice id or Piper voice stem.
     voice_by_lang: dict[str, str] = Field(
         default_factory=lambda: {

@@ -46,6 +46,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .panel { display:none; background:#161a22; border:1px solid #2a2f3a; border-radius:12px; padding:1rem; }
     .panel.active { display:block; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    .lang-cols { display:grid; grid-template-columns: 1fr 1fr; gap:.75rem; margin-top:.75rem; }
+    .lang-card { background:#0f1115; border:1px solid #2a2f3a; border-radius:10px; padding:.75rem .85rem; }
+    .lang-card h3 { margin:0 0 .35rem; font-size:.95rem; color:#e8eaed; }
+    .lang-card .hint { margin:0 0 .55rem; font-size:.72rem; color:#6e7681; }
     h2 { margin:0 0 .75rem; font-size:1rem; color:#9aa0a6; text-transform:uppercase; letter-spacing:.04em; }
     label { display:block; font-size:.8rem; color:#9aa0a6; margin:.55rem 0 .2rem; }
     input, textarea, select { width:100%; box-sizing:border-box; background:#0f1115; color:#e8eaed;
@@ -181,10 +185,34 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="grid">
         <div>
           <h2>TTS</h2>
-          <label>Engine</label>
-          <select id="tts.engine"><option value="kokoro">kokoro</option><option value="piper">piper</option></select>
-          <label>Voice</label>
-          <select id="tts.voice"></select>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
+            <input id="tts.match_input_language" type="checkbox" style="width:auto" />
+            Match engine/voice to last input language (not history)
+          </label>
+          <div class="lang-cols">
+            <div class="lang-card">
+              <h3>English</h3>
+              <p class="hint">Used when Whisper reports <code>en</code></p>
+              <label>Engine</label>
+              <select id="tts.engine_by_lang.en">
+                <option value="kokoro">kokoro</option>
+                <option value="piper">piper</option>
+              </select>
+              <label>Voice</label>
+              <select id="tts.voice_by_lang.en"></select>
+            </div>
+            <div class="lang-card">
+              <h3>German</h3>
+              <p class="hint">Used when Whisper reports <code>de</code></p>
+              <label>Engine</label>
+              <select id="tts.engine_by_lang.de">
+                <option value="kokoro">kokoro</option>
+                <option value="piper">piper</option>
+              </select>
+              <label>Voice</label>
+              <select id="tts.voice_by_lang.de"></select>
+            </div>
+          </div>
           <label>Speed</label><input id="tts.speed" type="number" step="0.05" />
           <label>Device</label>
           <select id="tts.device">
@@ -203,12 +231,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <input id="tts.monitor_local" type="checkbox" style="width:auto" />
             Monitor locally (play speech.wav on this machine)
           </label>
-          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
-            <input id="tts.match_input_language" type="checkbox" style="width:auto" />
-            Match voice/lang to last input language (not history)
-          </label>
-          <label>Voice when EN</label><input id="tts.voice_by_lang.en" placeholder="am_onyx" />
-          <label>Voice when DE</label><input id="tts.voice_by_lang.de" placeholder="am_onyx" />
         </div>
         <div>
           <h2>TTS Assets</h2>
@@ -279,8 +301,8 @@ const PATHS = [
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
   "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.speaking_tail_pad_ms",
   "stt.model_size","stt.device","stt.compute_type","stt.language",
-  "tts.engine","tts.voice","tts.speed","tts.device","tts.compute_type","tts.output_path",
-  "tts.voice_by_lang.en","tts.voice_by_lang.de",
+  "tts.speed","tts.device","tts.compute_type","tts.output_path",
+  "tts.engine_by_lang.en","tts.engine_by_lang.de",
   "osc.host","osc.port","osc.listen_host","osc.listen_port"
 ];
 let KOKORO_VOICES = [];
@@ -385,8 +407,9 @@ async function refreshWhisperModels(){
   );
 }
 
-function fillVoiceSelect(engine, current){
-  const sel = document.getElementById("tts.voice");
+function fillVoiceSelect(selectId, engine, current){
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
   const voices = engine === "piper" ? PIPER_VOICES : KOKORO_VOICES;
   sel.innerHTML = "";
   for (const v of voices){
@@ -396,34 +419,70 @@ function fillVoiceSelect(engine, current){
     sel.appendChild(opt);
   }
   if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
-  else if (!voices.includes(current) && current){
+  else if (current && !voices.includes(current)){
     const opt = document.createElement("option");
     opt.value = current;
     opt.textContent = current;
     sel.appendChild(opt);
     sel.value = current;
+  } else if (voices.length) {
+    sel.value = voices[0];
   }
 }
 
-async function refreshTtsModels(currentVoice){
+function fillLangVoiceSelects(cfg){
+  const enEngine = get(cfg, "tts.engine_by_lang.en")
+    || document.getElementById("tts.engine_by_lang.en").value
+    || get(cfg, "tts.engine")
+    || "kokoro";
+  const deEngine = get(cfg, "tts.engine_by_lang.de")
+    || document.getElementById("tts.engine_by_lang.de").value
+    || get(cfg, "tts.engine")
+    || "kokoro";
+  document.getElementById("tts.engine_by_lang.en").value = enEngine;
+  document.getElementById("tts.engine_by_lang.de").value = deEngine;
+  fillVoiceSelect(
+    "tts.voice_by_lang.en",
+    enEngine,
+    get(cfg, "tts.voice_by_lang.en")
+      || document.getElementById("tts.voice_by_lang.en").value
+      || get(cfg, "tts.voice")
+      || ""
+  );
+  fillVoiceSelect(
+    "tts.voice_by_lang.de",
+    deEngine,
+    get(cfg, "tts.voice_by_lang.de")
+      || document.getElementById("tts.voice_by_lang.de").value
+      || get(cfg, "tts.voice")
+      || ""
+  );
+}
+
+async function refreshTtsModels(cfg){
   const data = await (await fetch("/api/models/tts")).json();
   KOKORO_VOICES = data.kokoro.voices || [];
   PIPER_VOICES = (data.piper || []).map(p => p.voice);
-  fillVoiceSelect(document.getElementById("tts.engine").value, currentVoice || document.getElementById("tts.voice").value);
+  fillLangVoiceSelects(cfg || {});
   const rows = [
     { id: "kokoro", label: "kokoro (onnx + voices)", downloaded: data.kokoro.downloaded },
-    ...(data.piper || []).map(p => ({ id: p.id, label: p.id, downloaded: p.downloaded }))
+    ...(data.piper || []).map(p => ({ id: p.id, label: p.label || p.voice || p.id, downloaded: p.downloaded }))
   ];
   renderModelRows(
     document.getElementById("tts-models"),
     rows,
     (row) => {
-      if (row.id === "kokoro") document.getElementById("tts.engine").value = "kokoro";
-      else {
-        document.getElementById("tts.engine").value = "piper";
-        document.getElementById("tts.voice").value = row.id.replace(/^piper:/, "");
+      const deEngine = document.getElementById("tts.engine_by_lang.de");
+      const deVoice = document.getElementById("tts.voice_by_lang.de");
+      if (row.id === "kokoro") {
+        deEngine.value = "kokoro";
+        fillVoiceSelect("tts.voice_by_lang.de", "kokoro", deVoice.value);
+      } else {
+        const voice = row.id.replace(/^piper:/, "");
+        deEngine.value = "piper";
+        fillVoiceSelect("tts.voice_by_lang.de", "piper", voice);
       }
-      fillVoiceSelect(document.getElementById("tts.engine").value, document.getElementById("tts.voice").value);
+      setStatus("assigned to German column");
     },
     async (row) => {
       setStatus("downloading " + row.id);
@@ -446,7 +505,7 @@ async function loadConfig(){
   await loadDevices("output", "tts.output_device_id", cfg.tts.output_device_id);
   await refreshLlmModels();
   await refreshWhisperModels();
-  await refreshTtsModels(cfg.tts.voice);
+  await refreshTtsModels(cfg);
   setStatus("config loaded");
   return cfg;
 }
@@ -458,9 +517,15 @@ async function collectConfig(){
   set(cfg, "tts.output_device_id", document.getElementById("tts.output_device_id").value);
   cfg.tts.monitor_local = document.getElementById("tts.monitor_local").checked;
   cfg.tts.match_input_language = document.getElementById("tts.match_input_language").checked;
+  cfg.tts.engine_by_lang = cfg.tts.engine_by_lang || {};
   cfg.tts.voice_by_lang = cfg.tts.voice_by_lang || {};
+  cfg.tts.engine_by_lang.en = document.getElementById("tts.engine_by_lang.en").value || "kokoro";
+  cfg.tts.engine_by_lang.de = document.getElementById("tts.engine_by_lang.de").value || "kokoro";
   cfg.tts.voice_by_lang.en = document.getElementById("tts.voice_by_lang.en").value || cfg.tts.voice;
   cfg.tts.voice_by_lang.de = document.getElementById("tts.voice_by_lang.de").value || cfg.tts.voice;
+  // Legacy single fields track English (fallback when match is off).
+  cfg.tts.engine = cfg.tts.engine_by_lang.en;
+  cfg.tts.voice = cfg.tts.voice_by_lang.en;
   const lang = document.getElementById("stt.language").value;
   cfg.stt.language = lang === "" ? null : lang;
   return cfg;
@@ -487,7 +552,12 @@ document.getElementById("save").onclick = async () => {
   const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
   setStatus(res.ok ? "saved live" : "save failed");
 };
-document.getElementById("tts.engine").onchange = () => fillVoiceSelect(document.getElementById("tts.engine").value, document.getElementById("tts.voice").value);
+document.getElementById("tts.engine_by_lang.en").onchange = () => {
+  fillVoiceSelect("tts.voice_by_lang.en", document.getElementById("tts.engine_by_lang.en").value, document.getElementById("tts.voice_by_lang.en").value);
+};
+document.getElementById("tts.engine_by_lang.de").onchange = () => {
+  fillVoiceSelect("tts.voice_by_lang.de", document.getElementById("tts.engine_by_lang.de").value, document.getElementById("tts.voice_by_lang.de").value);
+};
 document.getElementById("refresh_llm").onclick = () => refreshLlmModels();
 document.getElementById("pull_btn").onclick = async () => {
   const name = document.getElementById("pull_name").value.trim() || document.getElementById("llm.model").value.trim();
@@ -719,6 +789,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
         updated = await store.update(body)
         pipeline.osc.reconfigure(updated.osc.host, updated.osc.port)
         await osc_server.reconfigure(updated.osc.listen_host, updated.osc.listen_port)
+        # Warm EN/DE TTS targets after live config changes (Kokoro + optional Piper).
+        _track(asyncio.create_task(pipeline.tts.preload(updated.tts)))
         return updated
 
     @app.get("/api/audio/devices")

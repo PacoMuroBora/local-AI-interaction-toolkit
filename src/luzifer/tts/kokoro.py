@@ -24,7 +24,7 @@ class TtsEngine:
 
     def __init__(self) -> None:
         self._kokoro = None
-        self._piper = None
+        self._piper_cache: dict[str, object] = {}
         self._kokoro_key: tuple[str, str, str, str] | None = None
 
     @staticmethod
@@ -154,19 +154,30 @@ class TtsEngine:
             logger.warning("Kokoro failed ({}), writing beep", exc)
             return self._write_beep(path)
 
+    def _piper_path(self, voice: str) -> Path:
+        return Path("models") / f"{voice}.onnx"
+
+    def _ensure_piper(self, voice: str) -> object:
+        from piper import PiperVoice
+
+        model_path = self._piper_path(voice)
+        key = str(model_path.resolve()) if model_path.exists() else str(model_path)
+        cached = self._piper_cache.get(key)
+        if cached is not None:
+            return cached
+        voice_model = PiperVoice.load(str(model_path))
+        self._piper_cache[key] = voice_model
+        logger.info("Piper loaded {}", voice)
+        return voice_model
+
     def _synthesize_piper(self, text: str, path: Path, settings: TtsSettings) -> SynthResult:
         try:
-            from piper import PiperVoice
-
-            model_path = Path("models") / f"{settings.voice}.onnx"
-            if self._piper is None or getattr(self._piper, "_luzifer_path", None) != str(model_path):
-                self._piper = PiperVoice.load(str(model_path))
-                self._piper._luzifer_path = str(model_path)  # type: ignore[attr-defined]
+            piper = self._ensure_piper(settings.voice)
 
             path.parent.mkdir(parents=True, exist_ok=True)
             t0 = time.perf_counter()
             with wave.open(str(path), "wb") as wf:
-                self._piper.synthesize_wav(text, wf)
+                piper.synthesize_wav(text, wf)  # type: ignore[attr-defined]
                 frames = wf.getnframes()
                 rate = wf.getframerate()
             duration = float(frames / rate) if rate else 0.5
@@ -183,9 +194,10 @@ class TtsEngine:
             except Exception:  # noqa: BLE001
                 pass
             logger.info(
-                "Piper synth {:.2f}s → {:.2f}s audio",
+                "Piper synth {:.2f}s → {:.2f}s audio (voice={})",
                 time.perf_counter() - t0,
                 duration,
+                settings.voice,
             )
             return duration, peak, envelope
         except Exception as exc:  # noqa: BLE001
@@ -198,24 +210,40 @@ class TtsEngine:
             return self._synthesize_piper(text, path, settings)
         return self._synthesize_kokoro(text, path, settings)
 
-    def preload_sync(self, settings: TtsSettings) -> None:
-        """Load the active TTS backend so the first spoken line isn't cold."""
-        engine = settings.engine.lower().strip()
-        if engine == "piper":
-            model_path = Path("models") / f"{settings.voice}.onnx"
-            if not model_path.exists():
-                logger.warning("Piper voice missing at {}, skip preload", model_path)
-                return
-            from piper import PiperVoice
+    def _lang_targets(self, settings: TtsSettings) -> list[tuple[str, str]]:
+        """Unique (engine, voice) pairs to keep warm for bilingual turns."""
+        pairs: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        if settings.match_input_language:
+            codes = sorted(set(settings.engine_by_lang) | set(settings.voice_by_lang) | {"en", "de"})
+            for code in codes:
+                engine = (settings.engine_by_lang.get(code) or settings.engine).lower().strip()
+                voice = settings.voice_by_lang.get(code) or settings.voice
+                key = (engine, voice)
+                if key not in seen:
+                    seen.add(key)
+                    pairs.append(key)
+        else:
+            pairs.append((settings.engine.lower().strip(), settings.voice))
+        return pairs
 
-            self._piper = PiperVoice.load(str(model_path))
-            self._piper._luzifer_path = str(model_path)  # type: ignore[attr-defined]
-            logger.info("Piper preloaded {}", settings.voice)
-            return
-        try:
-            self._ensure_kokoro(settings)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Kokoro preload failed: {}", exc)
+    def preload_sync(self, settings: TtsSettings) -> None:
+        """Load EN/DE backends so the first spoken line in either language isn't cold."""
+        for engine, voice in self._lang_targets(settings):
+            if engine == "piper":
+                model_path = self._piper_path(voice)
+                if not model_path.exists():
+                    logger.warning("Piper voice missing at {}, skip preload", model_path)
+                    continue
+                try:
+                    self._ensure_piper(voice)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Piper preload failed ({}): {}", voice, exc)
+                continue
+            try:
+                self._ensure_kokoro(settings)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Kokoro preload failed: {}", exc)
 
     async def preload(self, settings: TtsSettings) -> None:
         await asyncio.to_thread(self.preload_sync, settings)

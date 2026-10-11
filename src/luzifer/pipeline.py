@@ -54,11 +54,14 @@ def normalize_lang(code: str | None) -> str | None:
 
 
 def resolve_tts_for_lang(tts: TtsSettings, lang: str | None) -> TtsSettings:
-    """Copy TTS settings with voice/lang overridden for this turn's language."""
+    """Copy TTS settings with engine/voice/lang overridden for this turn's language."""
     out = tts.model_copy(deep=True)
     code = normalize_lang(lang)
     if not out.match_input_language or not code:
         return out
+    engine = out.engine_by_lang.get(code)
+    if engine:
+        out.engine = engine
     voice = out.voice_by_lang.get(code)
     if voice:
         out.voice = voice
