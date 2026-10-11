@@ -23,6 +23,9 @@ ADDR_SYNTHESIZING = "/luzifer/synthesizing"
 ADDR_AI_SPEAKING = "/luzifer/ai_speaking"
 ADDR_IN_LEVEL = "/luzifer/in_level"
 ADDR_OUT_LEVEL = "/luzifer/out_level"
+ADDR_VISION_TEXT = "/luzifer/vision_text"
+ADDR_VISION = "/luzifer/vision"
+ADDR_VISION_ACTIVE = "/luzifer/vision_active"
 
 OscArg = str | int | float
 
@@ -119,3 +122,14 @@ class TouchDesignerOscClient:
             ),
             log=False,
         )
+
+    async def send_vision_text(self, text: str) -> None:
+        await self._send(ADDR_VISION_TEXT, text)
+
+    async def send_vision_pulse(self) -> None:
+        """Rising edge then clear so OSC In CHOP can trigger on Off→On."""
+        await self._send(ADDR_VISION, 1)
+        await self._send(ADDR_VISION, 0)
+
+    async def send_vision_active(self, active: bool) -> None:
+        await self._send(ADDR_VISION_ACTIVE, 1 if active else 0)

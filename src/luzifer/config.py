@@ -90,6 +90,29 @@ class DashboardSettings(BaseModel):
     port: int = 8501
 
 
+class VisionSettings(BaseModel):
+    """NDI still-frame captioning wired into the chat pipeline."""
+
+    enabled: bool = False
+    ndi_source: str = "LuziferCam"
+    # external = TD/OSC pulse; local_idle = backend silence timer
+    trigger: str = "external"
+    interval_s: float = 4.0
+    idle_after_s: float = 12.0
+    speak_cooldown_s: float = 25.0
+    jpeg_max_edge: int = 512
+    change_threshold: float = 4.0
+    max_age_s: float = 30.0
+    model: str = "moondream"
+    prompt: str = (
+        "Factual notes only, one or two short sentences, English. "
+        "People, motion, objects, light. No mood, no story."
+    )
+    num_predict: int = 80
+    inject_context: bool = True
+    store_in_history: bool = False
+
+
 class AppSettings(BaseSettings):
     """Full runtime config. YAML base, then env overrides via LUZIFER_*."""
 
@@ -111,6 +134,7 @@ class AppSettings(BaseSettings):
     tts: TtsSettings = Field(default_factory=TtsSettings)
     osc: OscSettings = Field(default_factory=OscSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
+    vision: VisionSettings = Field(default_factory=VisionSettings)
 
     def resolve_output_path(self) -> Path:
         path = Path(self.tts.output_path)

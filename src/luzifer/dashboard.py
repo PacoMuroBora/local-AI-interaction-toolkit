@@ -21,8 +21,10 @@ from luzifer.osc.td_server import (
     ADDR_RESET,
     ADDR_SAY,
     ADDR_SPEAK,
+    ADDR_VISION,
     TouchDesignerOscServer,
 )
+from luzifer.vision.ndi import list_ndi_sources
 from luzifer.pipeline import Pipeline
 
 DASHBOARD_HTML = """<!DOCTYPE html>
@@ -50,6 +52,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .lang-card { background:#0f1115; border:1px solid #2a2f3a; border-radius:10px; padding:.75rem .85rem; }
     .lang-card h3 { margin:0 0 .35rem; font-size:.95rem; color:#e8eaed; }
     .lang-card .hint { margin:0 0 .55rem; font-size:.72rem; color:#6e7681; }
+    .hint { margin:.35rem 0 .55rem; font-size:.72rem; color:#6e7681; }
+    .hint code { font-size:.7rem; }
     h2 { margin:0 0 .75rem; font-size:1rem; color:#9aa0a6; text-transform:uppercase; letter-spacing:.04em; }
     label { display:block; font-size:.8rem; color:#9aa0a6; margin:.55rem 0 .2rem; }
     input, textarea, select { width:100%; box-sizing:border-box; background:#0f1115; color:#e8eaed;
@@ -118,6 +122,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button class="tab active" data-tab="audio-in">Audio In</button>
       <button class="tab" data-tab="audio-out">Audio Out</button>
       <button class="tab" data-tab="prompt-llm">Prompt / LLM</button>
+      <button class="tab" data-tab="vision">Vision</button>
     </nav>
     <span id="state" class="badge">connecting…</span>
     <span id="status"></span>
@@ -263,6 +268,56 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
     </section>
+
+    <section id="panel-vision" class="panel">
+      <div class="grid">
+        <div>
+          <h2>NDI Vision</h2>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
+            <input id="vision.enabled" type="checkbox" style="width:auto" />
+            Enabled
+          </label>
+          <label>NDI Source</label>
+          <div class="row">
+            <input id="vision.ndi_source" placeholder="LuziferCam" style="flex:1" />
+            <button id="refresh_ndi" class="secondary" type="button">Sources</button>
+          </div>
+          <select id="ndi_sources" style="margin-top:.4rem"></select>
+          <label>Trigger</label>
+          <select id="vision.trigger">
+            <option value="external">external (OSC from TD)</option>
+            <option value="local_idle">local_idle (backend silence timer)</option>
+          </select>
+          <p class="hint">External: TD decides idle + presence, then pulses <code>/luzifer/in/vision</code>. Local idle: backend captions when quiet.</p>
+          <label>Idle After (s)</label><input id="vision.idle_after_s" type="number" step="0.5" />
+          <label>Speak Cooldown (s)</label><input id="vision.speak_cooldown_s" type="number" step="0.5" />
+          <label>Sample Interval (s)</label><input id="vision.interval_s" type="number" step="0.5" />
+          <label>Change Threshold (0 = off)</label><input id="vision.change_threshold" type="number" step="0.5" />
+          <label>Max Caption Age (s)</label><input id="vision.max_age_s" type="number" step="1" />
+        </div>
+        <div>
+          <h2>Vision Model</h2>
+          <label>Ollama VLM</label><input id="vision.model" placeholder="moondream" />
+          <label>JPEG Max Edge</label><input id="vision.jpeg_max_edge" type="number" step="32" />
+          <label>Num Predict</label><input id="vision.num_predict" type="number" step="1" />
+          <label>Caption Prompt</label><textarea id="vision.prompt" rows="4"></textarea>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
+            <input id="vision.inject_context" type="checkbox" style="width:auto" />
+            Inject latest caption into next visitor turn
+          </label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
+            <input id="vision.store_in_history" type="checkbox" style="width:auto" />
+            Store vision comments in chat history
+          </label>
+          <h2 style="margin-top:1rem">Manual</h2>
+          <div class="row">
+            <button id="vision_analyze" type="button">Analyze</button>
+            <button id="vision_comment" type="button">Analyze + Comment</button>
+          </div>
+          <p class="hint">Buttons always work (force). They queue behind an in-progress turn.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
@@ -283,6 +338,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
     <div class="live"><strong>User:</strong> <span id="user_lang" style="opacity:.55;margin-right:.35rem"></span><span id="user_text"></span></div>
     <div class="live" style="margin-top:.5rem"><strong>AI:</strong> <span id="ai_text"></span></div>
+    <div class="live" style="margin-top:.5rem"><strong>Vision:</strong> <span id="vision_text" style="opacity:.85"></span></div>
     <div class="debug">
       <div style="flex:1;min-width:260px">
         <label>Test text (skip mic)</label>
@@ -290,6 +346,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
       <button id="send_say" type="button">Send → LLM+TTS</button>
       <button id="send_speak" class="secondary" type="button">Speak only</button>
+      <button id="vision_analyze_footer" class="secondary" type="button">Analyze</button>
+      <button id="vision_comment_footer" class="secondary" type="button">Analyze + Comment</button>
       <button id="interrupt" class="secondary" type="button">Interrupt</button>
       <button id="reset" class="danger" type="button">Reset session</button>
     </div>
@@ -303,7 +361,10 @@ const PATHS = [
   "stt.model_size","stt.device","stt.compute_type","stt.language",
   "tts.speed","tts.device","tts.compute_type","tts.output_path",
   "tts.engine_by_lang.en","tts.engine_by_lang.de",
-  "osc.host","osc.port","osc.listen_host","osc.listen_port"
+  "osc.host","osc.port","osc.listen_host","osc.listen_port",
+  "vision.ndi_source","vision.trigger","vision.idle_after_s","vision.speak_cooldown_s",
+  "vision.interval_s","vision.change_threshold","vision.max_age_s","vision.model",
+  "vision.jpeg_max_edge","vision.num_predict","vision.prompt"
 ];
 let KOKORO_VOICES = [];
 let PIPER_VOICES = [];
@@ -491,6 +552,23 @@ async function refreshTtsModels(cfg){
   );
 }
 
+async function refreshNdiSources(){
+  const sel = document.getElementById("ndi_sources");
+  sel.innerHTML = '<option value="">— refresh —</option>';
+  try {
+    const sources = await (await fetch("/api/vision/sources")).json();
+    for (const name of sources){
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    }
+    setStatus(sources.length ? (`${sources.length} NDI sources`) : "no NDI sources (is TD sending?)");
+  } catch (e) {
+    setStatus("NDI source list failed (install --extra vision?)");
+  }
+}
+
 async function loadConfig(){
   const cfg = await (await fetch("/api/config")).json();
   for (const p of PATHS){
@@ -501,6 +579,10 @@ async function loadConfig(){
   }
   setMonitorLocal(!!cfg.tts.monitor_local);
   document.getElementById("tts.match_input_language").checked = !!cfg.tts.match_input_language;
+  const v = cfg.vision || {};
+  document.getElementById("vision.enabled").checked = !!v.enabled;
+  document.getElementById("vision.inject_context").checked = v.inject_context !== false;
+  document.getElementById("vision.store_in_history").checked = !!v.store_in_history;
   await loadDevices("input", "audio.input_device_id", cfg.audio.input_device_id);
   await loadDevices("output", "tts.output_device_id", cfg.tts.output_device_id);
   await refreshLlmModels();
@@ -528,6 +610,10 @@ async function collectConfig(){
   cfg.tts.voice = cfg.tts.voice_by_lang.en;
   const lang = document.getElementById("stt.language").value;
   cfg.stt.language = lang === "" ? null : lang;
+  cfg.vision = cfg.vision || {};
+  cfg.vision.enabled = document.getElementById("vision.enabled").checked;
+  cfg.vision.inject_context = document.getElementById("vision.inject_context").checked;
+  cfg.vision.store_in_history = document.getElementById("vision.store_in_history").checked;
   return cfg;
 }
 
@@ -584,6 +670,20 @@ document.getElementById("interrupt").onclick = async () => {
 document.getElementById("reset").onclick = async () => {
   await fetch("/api/session/reset", {method:"POST"});
   setStatus("session reset");
+};
+async function queueVision(kind){
+  const path = kind === "comment" ? "/api/vision/comment" : "/api/vision/analyze";
+  await fetch(path, {method:"POST"});
+  setStatus(kind === "comment" ? "vision comment queued" : "vision analyze queued");
+}
+document.getElementById("vision_analyze").onclick = () => queueVision("analyze");
+document.getElementById("vision_comment").onclick = () => queueVision("comment");
+document.getElementById("vision_analyze_footer").onclick = () => queueVision("analyze");
+document.getElementById("vision_comment_footer").onclick = () => queueVision("comment");
+document.getElementById("refresh_ndi").onclick = () => refreshNdiSources();
+document.getElementById("ndi_sources").onchange = (ev) => {
+  const v = ev.target.value;
+  if (v) document.getElementById("vision.ndi_source").value = v;
 };
 
 function setMeter(barId, valId, level01, text){
@@ -643,6 +743,7 @@ function connectWs(){
       document.getElementById("user_lang").textContent = lang ? `[${lang}]` : "";
     }
     if ("ai_text" in msg) document.getElementById("ai_text").textContent = msg.ai_text || "";
+    if ("vision_text" in msg) document.getElementById("vision_text").textContent = msg.vision_text || "";
     if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg) {
       setActivityFlags(activityPayload(msg));
     }
@@ -726,6 +827,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "state": state,
                 "user_text": user_text,
                 "ai_text": ai_text,
+                "vision_text": pipeline.observations.text,
                 "language": pipeline.last_language,
                 "mic_on": pipeline.mic_on,
                 "stt": pipeline.stt_active,
@@ -887,6 +989,20 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
         await pipeline.reset_session()
         return {"status": "ok"}
 
+    @app.get("/api/vision/sources")
+    async def vision_sources() -> list[str]:
+        return await asyncio.to_thread(list_ndi_sources, 5.0)
+
+    @app.post("/api/vision/analyze")
+    async def vision_analyze() -> dict[str, str]:
+        await pipeline.analyze_vision()
+        return {"status": "queued"}
+
+    @app.post("/api/vision/comment")
+    async def vision_comment() -> dict[str, str]:
+        await pipeline.comment_vision()
+        return {"status": "queued"}
+
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
         await hub.connect(ws)
@@ -896,6 +1012,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "state": pipeline.state,
                     "user_text": pipeline.last_user_text,
                     "ai_text": pipeline.last_ai_text,
+                    "vision_text": pipeline.observations.text,
                     "language": pipeline.last_language,
                     "mic_on": pipeline.mic_on,
                     "stt": pipeline.stt_active,
@@ -936,6 +1053,14 @@ def _make_osc_handler(pipeline: Pipeline):
             elif isinstance(value, str):
                 enabled = value.strip() not in {"0", "false", "False", ""}
             await pipeline.set_listen(enabled)
+        elif address == ADDR_VISION:
+            fire = True
+            if isinstance(value, (int, float)):
+                fire = bool(int(value))
+            elif isinstance(value, str):
+                fire = value.strip() not in {"0", "false", "False", ""}
+            if fire:
+                await pipeline.request_vision_from_osc()
 
     return _on_command
 

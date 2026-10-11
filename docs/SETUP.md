@@ -21,7 +21,7 @@ Optional heavy extras (real STT / Silero / Kokoro+Piper):
 uv sync --extra all
 ```
 
-Or individually: `--extra stt`, `--extra vad`, `--extra tts`.
+Or individually: `--extra stt`, `--extra vad`, `--extra tts`, `--extra vision`.
 
 Copy env template if you need overrides:
 
@@ -53,8 +53,9 @@ Header tabs:
 - **Audio In** — mic, VAD, Whisper size + download cache status  
 - **Audio Out** — TTS engine/voice, local monitor, Kokoro/Piper asset downloads  
 - **Prompt / LLM** — system prompt, sampling, history turns, Ollama model list + pull  
+- **Vision** — NDI source, external vs local-idle trigger, VLM model/prompt, inject-context  
 
-Footer: live transcript, manual test text (**Send → LLM+TTS** / **Speak only**), **Interrupt**, **Reset session**.
+Footer: live transcript + vision caption, manual test text (**Send → LLM+TTS** / **Speak only**), **Analyze** / **Analyze + Comment**, **Interrupt**, **Reset session**.
 
 OSC host/ports are editable in the header strip and saved with config.
 
@@ -64,9 +65,30 @@ OSC host/ports are editable in the header strip and saved with config.
 
 ```bash
 ollama pull llama3.2
+# vision caption model (separate from the talker)
+ollama pull moondream
+```
+
+Keep both models resident when vision is on:
+
+```bash
+# Windows PowerShell example
+$env:OLLAMA_MAX_LOADED_MODELS = "2"
 ```
 
 Or use the dashboard Prompt / LLM tab (list + Pull). Change temperature / history in the dashboard or `config.yaml` (`llm.history_turns`).
+
+### NDI Vision (`--extra vision`)
+
+Requires the [NDI runtime](https://ndi.video/) (same stack TD uses) plus `uv sync --extra vision` (`cyndilib` + Pillow).
+
+1. In TD, add an **NDI Out TOP** named e.g. `LuziferCam` (match `vision.ndi_source`).
+2. Dashboard **Vision** tab: enable, pick source, leave **trigger = external**.
+3. TD pulses `/luzifer/in/vision 1` when idle + presence say so (blob/depth on your side).
+4. Or set **trigger = local_idle** for a backend silence timer (no local presence detector).
+5. **Analyze** captions only; **Analyze + Comment** captions and speaks. Both force-queue and ignore the trigger toggle.
+
+Captions go to `/luzifer/vision_text` and the dashboard footer. With `vision.inject_context`, the next visitor turn gets the caption on the system prompt (not history). The chat model stays text-only — frames never enter `llm.model`.
 
 ### Whisper (`--extra stt`)
 
@@ -121,9 +143,10 @@ If you still see `Failed to create CUDAExecutionProvider` / only `CPUExecutionPr
 
 1. **OSC In CHOP** — port `9000`. Int channels: `luzifer/listening`, `luzifer/user_speaking`, `luzifer/stt`, `luzifer/thinking`, `luzifer/synthesizing`, `luzifer/ai_speaking`, `luzifer/play`. Inactive flags are sent as `0`.
 2. **OSC In DAT** — same port if Windows delivers to both; strings (`state`, `user_text`, `ai_text`) only show up here.
-3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`.
+3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/luzifer/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`, `/vision`.
 4. **Audio File In → Audio VST → Audio Device Out**, all Timeslice. File = `luzifer-backend\runtime\output\speech.wav` (overwritten each line). On `luzifer/play` off→on, reload, wait 1 frame, play. On on→off, stop. Leave **Monitor locally** off.
-5. `luzifer/in_level` and `luzifer/out_level` are 30 Hz floats on the same OSC In CHOP. Full chain is in [OSC_SPEC.md](OSC_SPEC.md).
+5. `luzifer/in_level` and `luzifer/out_level` are 30 Hz floats on the same OSC In CHOP. Vision adds `luzifer/vision_text`, `luzifer/vision`, `luzifer/vision_active`. Full chain is in [OSC_SPEC.md](OSC_SPEC.md).
+6. Optional: **NDI Out TOP** → backend Vision tab. Pulse `/luzifer/in/vision 1` when your idle + presence logic says go.
 
 ## Live config
 

@@ -25,6 +25,9 @@ Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 | `/luzifer/play` | int | `1` then `0` | CHOP. `1` once `speech.wav` is written. Back to `0` when speaking ends, so the next line is a rising edge. |
 | `/luzifer/in_level` | float | `0.0`–`1.0` | CHOP. Mic peak, 30 Hz. `0` within ~120 ms of the mic closing. |
 | `/luzifer/out_level` | float | `0.0`–`1.0` | CHOP. Dry-wav peak envelope, 30 Hz, clocked from the `play` edge. `0` while synthesizing and after the file ends. Not the post-VST level. |
+| `/luzifer/vision_text` | string | `A person stands…` | DAT. Latest NDI still caption from the vision VLM. |
+| `/luzifer/vision` | int | `1` then `0` | CHOP. Pulse on each new caption (rising edge). |
+| `/luzifer/vision_active` | int | `1` or `0` | CHOP. `1` while the vision VLM HTTP call is in flight. |
 
 Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all six addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
 
@@ -125,6 +128,7 @@ Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message pe
 | `/luzifer/in/reset` | int `1` | Clear chat history and empty transcript fields. |
 | `/luzifer/in/interrupt` | int `1` | Abort think/speak, return to `listening`. |
 | `/luzifer/in/listen` | int `1` or `0` | Unmute (`1`) or mute (`0`) the microphone. |
+| `/luzifer/in/vision` | int `1` | Grab NDI still, caption, speak a reaction. Only when `vision.enabled` and `vision.trigger=external`. TD should gate on idle + presence. |
 
 ### Example OSC Out DAT rows
 
@@ -134,6 +138,7 @@ Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message pe
 /luzifer/in/reset	1
 /luzifer/in/interrupt	1
 /luzifer/in/listen	0
+/luzifer/in/vision	1
 ```
 
 Send with a CHOP Execute / DAT Execute that calls `op('oscout1').sendOSC(address, [arg])`, or pulse the OSC Out DAT send.

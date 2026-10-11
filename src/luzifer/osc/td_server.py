@@ -15,6 +15,7 @@ ADDR_SPEAK = "/luzifer/in/speak"
 ADDR_RESET = "/luzifer/in/reset"
 ADDR_INTERRUPT = "/luzifer/in/interrupt"
 ADDR_LISTEN = "/luzifer/in/listen"
+ADDR_VISION = "/luzifer/in/vision"
 
 CommandHandler = Callable[[str, Any], Awaitable[None] | None]
 
@@ -60,6 +61,7 @@ class TouchDesignerOscServer:
         dispatcher.map(ADDR_RESET, self._dispatch)
         dispatcher.map(ADDR_INTERRUPT, self._dispatch)
         dispatcher.map(ADDR_LISTEN, self._dispatch)
+        dispatcher.map(ADDR_VISION, self._dispatch)
         self._server = AsyncIOOSCUDPServer((host, port), dispatcher, self._loop)
         self._transport, _protocol = await self._server.create_serve_endpoint()
         logger.info("OSC inbound listening on {}:{}", host, port)
