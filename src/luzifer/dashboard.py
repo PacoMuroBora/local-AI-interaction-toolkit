@@ -552,17 +552,41 @@ async function refreshTtsModels(cfg){
   );
 }
 
+/** Prefer stream name: "HOST (LuziferCam)" → "LuziferCam" (stable across reboots). */
+function normalizeNdiSource(name){
+  const m = /^\s*(.+?)\s*\((.+)\)\s*$/.exec(name || "");
+  return (m ? m[2] : (name || "")).trim();
+}
+
+async function saveNdiSource(raw){
+  const value = normalizeNdiSource(raw);
+  if (!value) return;
+  document.getElementById("vision.ndi_source").value = value;
+  const cfg = await collectConfig();
+  cfg.vision = cfg.vision || {};
+  cfg.vision.ndi_source = value;
+  const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
+  setStatus(res.ok ? ("NDI source saved: " + value) : "save failed");
+}
+
 async function refreshNdiSources(){
   const sel = document.getElementById("ndi_sources");
-  sel.innerHTML = '<option value="">— refresh —</option>';
+  const current = (document.getElementById("vision.ndi_source").value || "").trim();
+  sel.innerHTML = '<option value="">— pick source —</option>';
   try {
     const sources = await (await fetch("/api/vision/sources")).json();
+    let matched = "";
     for (const name of sources){
       const opt = document.createElement("option");
       opt.value = name;
       opt.textContent = name;
+      const stream = normalizeNdiSource(name);
+      if (current && (name === current || stream === current || name.includes(current))) {
+        matched = name;
+      }
       sel.appendChild(opt);
     }
+    if (matched) sel.value = matched;
     setStatus(sources.length ? (`${sources.length} NDI sources`) : "no NDI sources (is TD sending?)");
   } catch (e) {
     setStatus("NDI source list failed (install --extra vision?)");
@@ -683,7 +707,11 @@ document.getElementById("vision_comment_footer").onclick = () => queueVision("co
 document.getElementById("refresh_ndi").onclick = () => refreshNdiSources();
 document.getElementById("ndi_sources").onchange = (ev) => {
   const v = ev.target.value;
-  if (v) document.getElementById("vision.ndi_source").value = v;
+  if (v) saveNdiSource(v);
+};
+document.getElementById("vision.ndi_source").onchange = (ev) => {
+  const v = (ev.target.value || "").trim();
+  if (v) saveNdiSource(v);
 };
 
 function setMeter(barId, valId, level01, text){

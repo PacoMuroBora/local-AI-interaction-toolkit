@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -9,6 +10,8 @@ import numpy as np
 from loguru import logger
 
 _CYNDILIB_WARNED = False
+# NDI find/recv is not safe across concurrent Finder instances on Windows.
+_NDI_LOCK = threading.RLock()
 
 
 def _import_cyndilib() -> tuple[Any, Any, Any, Any, Any] | None:
@@ -30,41 +33,39 @@ def _import_cyndilib() -> tuple[Any, Any, Any, Any, Any] | None:
 
 
 def list_ndi_sources(timeout_s: float = 5.0) -> list[str]:
-    """Discover NDI source names. Empty list if cyndilib/runtime missing.
-
-    Polls for ``timeout_s`` — ``wait_for_sources`` returns on the *first* change
-    (often a stale Access Manager entry), while the real TD Out can show up later.
-    """
+    """Discover NDI source names. Empty list if cyndilib/runtime missing."""
     mods = _import_cyndilib()
     if mods is None:
         return []
     Finder, *_rest = mods
     seen: dict[str, None] = {}
-    try:
-        with Finder() as finder:
-            deadline = time.time() + max(0.5, timeout_s)
-            while time.time() < deadline:
-                finder.wait_for_sources(min(1.0, max(0.1, deadline - time.time())))
-                for full in finder.get_source_names() or []:
-                    if full:
-                        seen.setdefault(full, None)
-                for source in finder:
-                    full = getattr(source, "name", "") or ""
-                    stream = getattr(source, "stream_name", "") or ""
-                    if full:
-                        seen.setdefault(full, None)
-                    if stream:
-                        seen.setdefault(stream, None)
-                if seen and time.time() >= deadline - 0.05:
-                    break
-                time.sleep(0.15)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("NDI source list failed: {}", exc)
+    with _NDI_LOCK:
+        try:
+            with Finder() as finder:
+                deadline = time.time() + max(0.5, timeout_s)
+                while time.time() < deadline:
+                    remaining = deadline - time.time()
+                    if remaining <= 0:
+                        break
+                    finder.wait_for_sources(min(1.0, remaining))
+                    for full in finder.get_source_names() or []:
+                        if full:
+                            seen.setdefault(full, None)
+                    for source in finder:
+                        full = getattr(source, "name", "") or ""
+                        stream = getattr(source, "stream_name", "") or ""
+                        if full:
+                            seen.setdefault(full, None)
+                        if stream:
+                            seen.setdefault(stream, None)
+                    time.sleep(0.15)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("NDI source list failed: {}", exc)
     return list(seen.keys())
 
 
 class NdiGrabber:
-    """Long-lived NDI receiver bound by source name. Thread-safe for to_thread use."""
+    """Long-lived NDI receiver. All public methods take the process-wide NDI lock."""
 
     def __init__(self) -> None:
         self._finder: Any | None = None
@@ -78,8 +79,19 @@ class NdiGrabber:
         return self._available
 
     def close(self) -> None:
+        with _NDI_LOCK:
+            self._close_unlocked()
+
+    def _close_unlocked(self) -> None:
+        receiver = self._receiver
         self._receiver = None
         self._video_frame = None
+        if receiver is not None:
+            try:
+                if hasattr(receiver, "disconnect"):
+                    receiver.disconnect()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("NDI receiver disconnect: {}", exc)
         if self._finder is not None:
             try:
                 self._finder.__exit__(None, None, None)
@@ -101,7 +113,7 @@ class NdiGrabber:
         ):
             return True
 
-        self.close()
+        self._close_unlocked()
         try:
             finder = Finder()
             finder.__enter__()
@@ -109,7 +121,6 @@ class NdiGrabber:
             source = self._find_source(finder, want, timeout_s=6.0)
             if source is None and not want:
                 names = finder.get_source_names() or []
-                # Prefer a real stream over Access Manager "Remote Connection *" stubs
                 for n in names:
                     if "Remote Connection" in n:
                         continue
@@ -151,7 +162,7 @@ class NdiGrabber:
             return True
         except Exception as exc:  # noqa: BLE001
             logger.warning("NDI connect failed: {}", exc)
-            self.close()
+            self._close_unlocked()
             return False
 
     @staticmethod
@@ -160,7 +171,10 @@ class NdiGrabber:
         deadline = time.time() + max(0.5, timeout_s)
         best = None
         while time.time() < deadline:
-            finder.wait_for_sources(min(1.0, max(0.1, deadline - time.time())))
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                break
+            finder.wait_for_sources(min(1.0, remaining))
             for candidate in finder:
                 full = getattr(candidate, "name", "") or ""
                 stream = getattr(candidate, "stream_name", "") or ""
@@ -169,7 +183,6 @@ class NdiGrabber:
                 if full == want or stream == want:
                     return candidate
                 if want in full or want in stream:
-                    # Prefer exact stream_name match over loose hostname hits later
                     if stream == want or full.endswith(f"({want})"):
                         return candidate
                     best = best or candidate
@@ -179,37 +192,39 @@ class NdiGrabber:
         return None
 
     def latest_rgb(self, source_name: str) -> np.ndarray | None:
-        """Return HxWx3 uint8 RGB frame, or None."""
-        if not self._ensure_connected(source_name):
-            return None
-        assert self._receiver is not None and self._video_frame is not None
-        try:
-            vf = self._video_frame
-            # First captures after connect are often empty — retry briefly.
-            for _ in range(30):
-                self._receiver.frame_sync.capture_video()
-                resolution = vf.get_resolution()
-                size = vf.get_data_size()
-                if min(resolution) > 0 and size > 0:
-                    break
-                time.sleep(0.05)
-            else:
+        """Return HxWx3 uint8 RGB frame, or None. Copies pixels off the NDI buffer."""
+        with _NDI_LOCK:
+            if not self._ensure_connected(source_name):
                 return None
-            # NDI resolution is (xres, yres)
-            xres, yres = int(resolution[0]), int(resolution[1])
-            arr = np.asarray(vf.get_array(), dtype=np.uint8)
-            # RGBX / RGBA packed — get_array() is often flat
-            if arr.ndim == 1:
-                if arr.size >= yres * xres * 4 and arr.size % (yres * xres) == 0:
-                    channels = arr.size // (yres * xres)
-                    arr = arr[: yres * xres * channels].reshape((yres, xres, channels))
+            assert self._receiver is not None and self._video_frame is not None
+            try:
+                vf = self._video_frame
+                # First captures after connect are often empty — retry briefly.
+                resolution = (0, 0)
+                for _ in range(30):
+                    self._receiver.frame_sync.capture_video()
+                    resolution = vf.get_resolution()
+                    size = vf.get_data_size()
+                    if min(resolution) > 0 and size > 0:
+                        break
+                    time.sleep(0.05)
                 else:
                     return None
-            elif arr.ndim == 2:
-                arr = arr.reshape((yres, xres, -1))
-            if arr.ndim == 3 and arr.shape[-1] >= 3:
-                return np.ascontiguousarray(arr[..., :3])
-            return None
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("NDI frame grab failed: {}", exc)
-            return None
+                # NDI resolution is (xres, yres)
+                xres, yres = int(resolution[0]), int(resolution[1])
+                # Copy immediately — FrameSync buffers are transient.
+                arr = np.array(vf.get_array(), dtype=np.uint8, copy=True)
+                if arr.ndim == 1:
+                    if arr.size >= yres * xres * 4 and arr.size % (yres * xres) == 0:
+                        channels = arr.size // (yres * xres)
+                        arr = arr[: yres * xres * channels].reshape((yres, xres, channels))
+                    else:
+                        return None
+                elif arr.ndim == 2:
+                    arr = arr.reshape((yres, xres, -1))
+                if arr.ndim == 3 and arr.shape[-1] >= 3:
+                    return np.ascontiguousarray(arr[..., :3])
+                return None
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("NDI frame grab failed: {}", exc)
+                return None

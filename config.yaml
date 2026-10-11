@@ -76,7 +76,7 @@ dashboard:
   port: 8501
 vision:
   enabled: true
-  ndi_source: CROKET-RTX4080 (Remote Connection 1)
+  ndi_source: LuziferCam
   trigger: local_idle
   interval_s: 4.0
   idle_after_s: 12.0
