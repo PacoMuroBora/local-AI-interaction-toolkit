@@ -7,6 +7,7 @@ import base64
 import io
 import re
 import time
+from typing import Any
 
 import httpx
 from loguru import logger
@@ -33,6 +34,22 @@ def is_usable_caption(text: str) -> bool:
 # resets Ollama's 5 minute default and drops the other model.
 _TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 _KEEP_ALIVE = -1
+
+
+def runner_options(
+    settings: VisionSettings,
+    *,
+    temperature: float,
+    num_predict: int,
+) -> dict[str, Any]:
+    """Same load-time contract as the chat client. A later call that drops these reloads."""
+    return {
+        "temperature": temperature,
+        "num_predict": int(num_predict),
+        "num_ctx": int(settings.num_ctx),
+        "num_gpu": int(settings.num_gpu),
+        "num_batch": int(settings.num_batch),
+    }
 
 
 def _tiny_jpeg() -> bytes:
@@ -94,7 +111,7 @@ class VisionOllama:
                                 "images": [b64],
                             }
                         ],
-                        "options": {"temperature": 0, "num_predict": 1},
+                        "options": runner_options(settings, temperature=0, num_predict=1),
                     },
                 )
                 response.raise_for_status()
@@ -106,7 +123,14 @@ class VisionOllama:
                     exc,
                 )
                 return False
-        logger.info("Vision model ready in {:.1f}s ({})", time.perf_counter() - t0, model)
+        logger.info(
+            "Vision model ready in {:.1f}s ({}, num_gpu={}, num_ctx={}, num_batch={})",
+            time.perf_counter() - t0,
+            model,
+            settings.num_gpu,
+            settings.num_ctx,
+            settings.num_batch,
+        )
         return True
 
     async def describe(
@@ -132,10 +156,11 @@ class VisionOllama:
             "Describe the scene in one or two short factual English sentences. "
             "Name people, pose, clothing, objects, and background. No poetry."
         )
-        options = {
-            "temperature": 0.1,
-            "num_predict": max(32, int(settings.num_predict)),
-        }
+        options = runner_options(
+            settings,
+            temperature=0.1,
+            num_predict=max(32, int(settings.num_predict)),
+        )
 
         # 1) chat API
         try:

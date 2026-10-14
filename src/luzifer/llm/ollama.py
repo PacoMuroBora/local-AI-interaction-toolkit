@@ -21,6 +21,25 @@ _TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 _KEEP_ALIVE = -1
 
 
+def runner_options(
+    settings: LlmSettings,
+    *,
+    temperature: float,
+    num_predict: int,
+    top_p: float | None = None,
+) -> dict[str, Any]:
+    """Load-time knobs. Omit them on a later call and Ollama builds a new runner."""
+    options: dict[str, Any] = {
+        "temperature": temperature,
+        "num_predict": int(num_predict),
+        "num_ctx": int(settings.num_ctx),
+        "num_gpu": int(settings.num_gpu),
+    }
+    if top_p is not None:
+        options["top_p"] = top_p
+    return options
+
+
 def models_match(requested: str, loaded: str) -> bool:
     """True when an /api/ps name is the tag we asked Ollama to load."""
 
@@ -74,6 +93,22 @@ class OllamaEngine:
                     names.append(name)
         return names
 
+    async def unload(self, model: str, base_url: str) -> None:
+        """Drop a resident runner. No-op when it is not loaded (does not pull weights)."""
+        name = (model or "").strip()
+        if not name:
+            return
+        if not any(models_match(name, loaded) for loaded in await self.loaded_models(base_url)):
+            return
+        async with self._lock:
+            client = await self._get_client(base_url)
+            response = await client.post(
+                "/api/generate",
+                json={"model": name, "keep_alive": 0},
+            )
+            response.raise_for_status()
+        logger.info("Unloaded {}", name)
+
     async def warmup(self, settings: LlmSettings) -> bool:
         """Load the chat model and pin it. One token, no history. Serialized on `lock`."""
         model = (settings.model or "").strip()
@@ -91,7 +126,7 @@ class OllamaEngine:
                         "stream": False,
                         "keep_alive": _KEEP_ALIVE,
                         "messages": [{"role": "user", "content": "Reply with ok."}],
-                        "options": {"temperature": 0, "num_predict": 1},
+                        "options": runner_options(settings, temperature=0, num_predict=1),
                     },
                 )
                 response.raise_for_status()
@@ -103,7 +138,13 @@ class OllamaEngine:
                     exc,
                 )
                 return False
-        logger.info("Chat model ready in {:.1f}s ({})", time.perf_counter() - t0, model)
+        logger.info(
+            "Chat model ready in {:.1f}s ({}, num_gpu={}, num_ctx={})",
+            time.perf_counter() - t0,
+            model,
+            settings.num_gpu,
+            settings.num_ctx,
+        )
         return True
 
     async def chat(
@@ -133,18 +174,34 @@ class OllamaEngine:
             "stream": False,
             "keep_alive": _KEEP_ALIVE,
             "messages": messages,
-            "options": {
-                "temperature": settings.temperature,
-                "top_p": settings.top_p,
-                "num_predict": settings.max_tokens,
-            },
+            "options": runner_options(
+                settings,
+                temperature=settings.temperature,
+                num_predict=settings.max_tokens,
+                top_p=settings.top_p,
+            ),
         }
+        t0 = time.perf_counter()
         try:
             response = await client.post("/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
             content = data.get("message", {}).get("content", "")
+            _log_chat_speed(settings.model, data, time.perf_counter() - t0)
             return str(content).strip()
         except Exception as exc:  # noqa: BLE001
-            logger.error("Ollama chat failed: {}", exc)
+            logger.error("Ollama chat failed after {:.1f}s: {}", time.perf_counter() - t0, exc)
             return "I am momentarily silent. Try again in a moment."
+
+
+def _log_chat_speed(model: str, data: dict[str, Any], elapsed_s: float) -> None:
+    eval_ns = float(data.get("eval_duration") or 0)
+    eval_count = int(data.get("eval_count") or 0)
+    tok_s = (eval_count / (eval_ns / 1e9)) if eval_ns > 0 else 0.0
+    logger.info("Chat {} {:.1f}s, {} tok, {:.1f} tok/s", model, elapsed_s, eval_count, tok_s)
+    if 0 < tok_s < 8:
+        logger.warning(
+            "Chat decode is {:.1f} tok/s. The talker is starved for VRAM — "
+            "lower vision.num_gpu (0 puts the VLM on CPU) and restart.",
+            tok_s,
+        )

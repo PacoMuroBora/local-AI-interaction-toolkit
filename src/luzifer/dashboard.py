@@ -85,6 +85,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .pill.missing { background:#da363344; color:#f85149; }
     .live { white-space:pre-wrap; background:#0f1115; border-radius:8px; padding:.75rem; min-height:2.5rem; border:1px solid #2a2f3a; }
     footer { border-top:1px solid #2a2f3a; padding:1rem 1.25rem 1.25rem; background:#12151c; }
+    .warmup-bar { display:flex; align-items:center; gap:.6rem; margin:0 0 .75rem; padding:.55rem .75rem;
+      border:1px solid #9e6a0366; border-radius:8px; background:#9e6a0322; color:#d29922;
+      font-size:.85rem; font-weight:600; }
+    .warmup-bar[hidden] { display:none; }
+    .warmup-bar .dot { width:.55rem; height:.55rem; border-radius:50%; background:#d29922;
+      box-shadow:0 0 8px #d29922aa; flex:0 0 auto; }
     footer .transcript-head { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-bottom:.75rem; }
     footer .transcript-head h2 { margin:0; }
     .flags { display:flex; gap:.5rem; align-items:center; }
@@ -275,6 +281,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Top-P</label><input id="llm.top_p" type="number" step="0.05" />
           <label>Max Tokens</label><input id="llm.max_tokens" type="number" step="1" />
           <label>History Turns (0 = none)</label><input id="llm.history_turns" type="number" step="1" />
+          <label>Context (num_ctx)</label><input id="llm.num_ctx" type="number" step="256" />
+          <label>GPU layers</label><input id="llm.num_gpu" type="number" step="1" />
+          <p class="hint">Ollama has no MB cap. GPU layers is the VRAM knob. <strong>99</strong> keeps every chat layer on the GPU. Saving reloads both runners, chat first.</p>
         </div>
         <div>
           <h2>Ollama Models</h2>
@@ -319,6 +328,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Ollama VLM</label><input id="vision.model" placeholder="moondream" />
           <label>JPEG Max Edge</label><input id="vision.jpeg_max_edge" type="number" step="32" />
           <label>Num Predict</label><input id="vision.num_predict" type="number" step="1" />
+          <label>Context (num_ctx)</label><input id="vision.num_ctx" type="number" step="256" />
+          <label>GPU layers</label><input id="vision.num_gpu" type="number" step="1" />
+          <label>Batch (num_batch)</label><input id="vision.num_batch" type="number" step="32" />
+          <p class="hint">Vision gives VRAM back to the talker. <strong>8</strong> of ~37 layers on a 16&nbsp;GB card; <strong>0</strong> is CPU and slower. 2048 context fits a 512px still. Saving reloads chat first, then vision.</p>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
             <input id="vision.inject_context" type="checkbox" style="width:auto" />
             Inject latest caption into next visitor turn
@@ -399,6 +412,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </main>
 
   <footer>
+    <div id="warmup-bar" class="warmup-bar" hidden>
+      <span class="dot"></span>
+      <span id="warmup-text">Warming up…</span>
+    </div>
     <div class="transcript-head">
       <h2>Live Transcript</h2>
       <div class="flags">
@@ -436,6 +453,7 @@ const PATHS = [
   "name",
   "system_prompt",
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
+  "llm.num_ctx","llm.num_gpu",
   "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.speaking_tail_pad_ms",
   "stt.model_size","stt.device","stt.compute_type","stt.language",
   "tts.speed","tts.device","tts.compute_type","tts.output_path",
@@ -443,7 +461,7 @@ const PATHS = [
   "osc.host","osc.port","osc.listen_host","osc.listen_port",
   "vision.ndi_source","vision.trigger","vision.idle_after_s","vision.speak_cooldown_s",
   "vision.interval_s","vision.change_threshold","vision.max_age_s","vision.model",
-  "vision.jpeg_max_edge","vision.num_predict","vision.prompt"
+  "vision.jpeg_max_edge","vision.num_predict","vision.num_ctx","vision.num_gpu","vision.num_batch","vision.prompt"
 ];
 let KOKORO_VOICES = [];
 let PIPER_VOICES = [];
@@ -471,6 +489,19 @@ function applyBrand(value){
   document.title = name + " Dashboard";
 }
 function setStatus(msg){ document.getElementById("status").textContent = msg || ""; }
+function applyWarmup(warmup){
+  const bar = document.getElementById("warmup-bar");
+  if (!bar) return;
+  if (!warmup || !warmup.active) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  const step = Math.max(0, Math.round(warmup.step_s || 0));
+  const total = Math.max(0, Math.round(warmup.elapsed_s || 0));
+  document.getElementById("warmup-text").textContent =
+    `Warming up · ${warmup.label || "starting"} · ${step}s (total ${total}s)`;
+}
 
 document.querySelectorAll(".tab").forEach(btn => {
   btn.onclick = () => {
@@ -924,6 +955,7 @@ function connectWs(){
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
+    if ("warmup" in msg) applyWarmup(msg.warmup);
     if (msg.type === "metrics") {
       applyMetrics(msg);
       if ("vision_text" in msg) setVisionResult(msg.vision_text || "");
@@ -1034,6 +1066,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "ai_speaking": pipeline.ai_speaking,
                 "vision_analyzing": pipeline.vision_analyzing,
                 "vision_ready": pipeline.vision_ready,
+                "warmup": pipeline.warmup_status(),
             }
         )
 
@@ -1078,6 +1111,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 payload["vision_ready"] = pipeline.vision_ready
                 payload["vision_text"] = pipeline.observations.text
                 payload["state"] = pipeline.state
+                payload["warmup"] = pipeline.warmup_status()
                 await hub.broadcast(payload)
                 await asyncio.sleep(0.5)
 
@@ -1101,11 +1135,15 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
 
     @app.put("/api/config", response_model=AppSettings)
     async def put_config(body: AppSettings) -> AppSettings:
+        previous = await store.get()
         updated = await store.update(body)
         pipeline.osc.reconfigure(updated.osc.host, updated.osc.port)
         await osc_server.reconfigure(updated.osc.listen_host, updated.osc.listen_port)
         # Warm EN/DE TTS targets after live config changes (Kokoro + optional Piper).
         _track(asyncio.create_task(pipeline.tts.preload(updated.tts)))
+        if _runner_budget(previous) != _runner_budget(updated) and pipeline._models_ready.is_set():
+            logger.info("GPU budget changed — reloading chat, then vision")
+            _track(asyncio.create_task(pipeline.rebalance_models()))
         return updated
 
     @app.get("/api/audio/devices")
@@ -1234,6 +1272,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "ai_speaking": pipeline.ai_speaking,
                     "vision_analyzing": pipeline.vision_analyzing,
                     "vision_ready": pipeline.vision_ready,
+                    "warmup": pipeline.warmup_status(),
                 }
             )
         )
@@ -1244,6 +1283,22 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
             await hub.disconnect(ws)
 
     return app
+
+
+def _runner_budget(settings: AppSettings) -> tuple[Any, ...]:
+    """Fields that change the Ollama runner. A mismatch reloads and can evict the other model."""
+    llm, vision = settings.llm, settings.vision
+    return (
+        llm.model,
+        llm.base_url,
+        int(llm.num_ctx),
+        int(llm.num_gpu),
+        bool(vision.enabled),
+        vision.model,
+        int(vision.num_ctx),
+        int(vision.num_gpu),
+        int(vision.num_batch),
+    )
 
 
 def _make_osc_handler(pipeline: Pipeline):

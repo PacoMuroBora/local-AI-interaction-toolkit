@@ -47,6 +47,8 @@ llm:
   top_p: 0.9
   max_tokens: 1024
   history_turns: 12
+  num_ctx: 4096
+  num_gpu: 99
 tts:
   engine: kokoro
   voice: am_onyx
@@ -63,13 +65,14 @@ tts:
     de: piper
   voice_by_lang:
     en: am_onyx
-    de: de_DE-thorsten_emotional-medium
-  speaker_by_lang:
-    en: neutral
-    de: neutral
+    de: de_DE-thorsten-medium
   lang_by_lang:
     en: en-us
     de: de
+  speaker: neutral
+  speaker_by_lang:
+    en: neutral
+    de: angry
 osc:
   host: 127.0.0.1
   port: 9000
@@ -90,8 +93,11 @@ vision:
   max_age_s: 30.0
   model: qwen2.5vl:3b
   prompt: Describe the scene in one or two short factual English sentences. Mention
-    people (approx age/gender if clear), pose, clothing, objects (not background).
-    No poetry, no mood, no questions.
+    people (approx age/gender if clear), pose, emotion, gadgets, clothing, objects
+    (not background). No poetry, no mood, no questions.
   num_predict: 120
+  num_ctx: 2048
+  num_gpu: 8
+  num_batch: 128
   inject_context: true
   store_in_history: false

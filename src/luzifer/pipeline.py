@@ -127,6 +127,10 @@ class Pipeline:
         self.vad.metrics = self.metrics
         self.state: StateName = "loading"
         self._models_ready = asyncio.Event()
+        self._warmup_t0 = time.monotonic()
+        self._warmup_step_t = self._warmup_t0
+        self._warmup_label = "starting"
+        self._warmup_done = False
         self.last_user_text = ""
         self.last_ai_text = ""
         # Language of the most recent user input only (Whisper or text heuristic).
@@ -202,6 +206,18 @@ class Pipeline:
 
     def is_listening(self) -> bool:
         return self._running and self.state == "listening" and self._mic_enabled
+
+    def warmup_status(self) -> dict[str, Any] | None:
+        """Footer payload. None once startup (or a GPU-budget reload) has finished."""
+        if self._warmup_done:
+            return None
+        now = time.monotonic()
+        return {
+            "active": True,
+            "label": self._warmup_label,
+            "elapsed_s": round(now - self._warmup_t0, 1),
+            "step_s": round(now - self._warmup_step_t, 1),
+        }
 
     async def _publish_flags(self, *, user_speaking: bool = False) -> None:
         listening = self.state == "listening"
@@ -336,7 +352,31 @@ class Pipeline:
             if self._active_task is task:
                 self._active_task = None
 
+    def _mark_warmup(self, message: str) -> None:
+        now = time.monotonic()
+        if self._warmup_label not in ("", "starting"):
+            logger.info("warmup {!r} {:.1f}s", self._warmup_label, now - self._warmup_step_t)
+        self._warmup_label = message
+        self._warmup_step_t = now
+
+    def _begin_warmup(self) -> None:
+        self._warmup_done = False
+        self._warmup_t0 = time.monotonic()
+        self._warmup_step_t = self._warmup_t0
+        self._warmup_label = "starting"
+
+    def _finish_warmup(self) -> None:
+        if self._warmup_label not in ("", "starting"):
+            logger.info(
+                "warmup {!r} {:.1f}s",
+                self._warmup_label,
+                time.monotonic() - self._warmup_step_t,
+            )
+        logger.info("Warmup finished in {:.1f}s", time.monotonic() - self._warmup_t0)
+        self._warmup_done = True
+
     async def _boot(self, message: str) -> None:
+        self._mark_warmup(message)
         self.last_ai_text = message
         logger.info(message)
         if self.state != "loading":
@@ -345,6 +385,17 @@ class Pipeline:
         await self.osc.send_state("loading")
         await self._publish_flags(user_speaking=False)
         await self._notify()
+
+    async def _release_vision(self, settings: Any) -> None:
+        """Free the VLM runner before the talker allocates, so the 14B is not paging."""
+        model = (settings.vision.model or "").strip()
+        if not model:
+            return
+        await self._boot(f"unloading {model}")
+        try:
+            await self.llm.unload(model, settings.llm.base_url)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not unload {}: {}", model, exc)
 
     async def _ensure_chat_resident(self, settings: Any) -> None:
         """Vision warmup can evict the talker when Ollama only has one model slot."""
@@ -367,6 +418,39 @@ class Pipeline:
         await self._boot(f"loading {llm.model}")
         await self.llm.warmup(llm)
 
+    async def rebalance_models(self) -> None:
+        """Reload runners after a GPU-layer / context change. Chat loads first."""
+        task = self._active_task
+        if task is not None and not task.done():
+            logger.info("GPU budget change waits for the current turn")
+            try:
+                await task
+            except Exception:  # noqa: BLE001
+                pass
+        settings = await self.store.get()
+        self._begin_warmup()
+        try:
+            await self._release_vision(settings)
+            await self._boot(
+                f"loading {settings.llm.model} ({settings.llm.num_gpu} gpu layers)"
+            )
+            chat_ok = await self.llm.warmup(settings.llm)
+            vision = settings.vision
+            if vision.enabled and vision.model.strip():
+                await self._boot(f"loading {vision.model} ({vision.num_gpu} gpu layers)")
+                await self._vision_llm.warmup(vision, base_url=settings.llm.base_url)
+                if chat_ok:
+                    await self._ensure_chat_resident(settings)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Model rebalance failed: {}", exc)
+        finally:
+            self._finish_warmup()
+            self.last_ai_text = ""
+            if self.state == "loading":
+                await self.set_state("listening")
+            else:
+                await self._notify()
+
     async def _warmup(self, settings: Any) -> None:
         """TTS → Whisper → chat → vision, strictly one GPU load at a time.
 
@@ -374,6 +458,7 @@ class Pipeline:
         CTAs wait on `_models_ready` so they can't sneak a second Ollama load in
         between steps.
         """
+        self._begin_warmup()
         try:
             await self._boot("loading TTS")
             await self.tts.preload(settings.tts)
@@ -382,18 +467,25 @@ class Pipeline:
             await self._boot(f"loading whisper {stt.model_size}")
             await self.stt.preload(stt)
 
-            await self._boot(f"loading {settings.llm.model}")
+            # Vision is the expendable resident. Drop it before the talker loads
+            # so a full card cannot force the 14B into a CPU/GPU split.
+            await self._release_vision(settings)
+
+            await self._boot(
+                f"loading {settings.llm.model} ({settings.llm.num_gpu} gpu layers)"
+            )
             chat_ok = await self.llm.warmup(settings.llm)
 
             vision = settings.vision
             if vision.enabled and vision.model.strip():
-                await self._boot(f"loading {vision.model}")
+                await self._boot(f"loading {vision.model} ({vision.num_gpu} gpu layers)")
                 await self._vision_llm.warmup(vision, base_url=settings.llm.base_url)
                 if chat_ok:
                     await self._ensure_chat_resident(settings)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Warmup failed: {}", exc)
         finally:
+            self._finish_warmup()
             self.last_ai_text = ""
             # Idle timer starts when the system is actually up, not at process start.
             self._last_activity_at = time.monotonic()

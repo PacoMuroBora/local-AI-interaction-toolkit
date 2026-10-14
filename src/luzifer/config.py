@@ -38,6 +38,11 @@ class LlmSettings(BaseModel):
     top_p: float = 0.9
     max_tokens: int = 256
     history_turns: int = 12
+    # Runner shape. Ollama has no per-model MB cap — num_gpu is the VRAM lever
+    # (layers resident on the GPU). 99 keeps every chat layer on the GPU.
+    # num_ctx is the KV cache. Both must be sent on every request or Ollama reloads.
+    num_ctx: int = 4096
+    num_gpu: int = 99
 
 
 class TtsSettings(BaseModel):
@@ -121,6 +126,11 @@ class VisionSettings(BaseModel):
         "and background. No poetry, no mood, no questions."
     )
     num_predict: int = 120
+    # Partial offload. The talker stays at num_gpu 99; vision gives VRAM back.
+    # 0 = entire VLM on CPU. 8 of ~37 layers is the 16 GB default.
+    num_ctx: int = 2048
+    num_gpu: int = 8
+    num_batch: int = 128
     inject_context: bool = True
     store_in_history: bool = False
 
