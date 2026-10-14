@@ -733,23 +733,44 @@ class Pipeline:
         await self.set_state("speaking")
         self.metrics.arm_output(envelope, 1.0 / LEVEL_HZ)
         await self.osc.send_play()
+        # Negative pad = reopen mic before the wav ends (catch barge-in / early reply).
         pad = settings.audio.speaking_tail_pad_ms / 1000.0
+        wait_s = max(0.05, duration + pad)
 
+        play_task: asyncio.Task[None] | None = None
         if settings.tts.monitor_local:
-            # Local playback is the clock — resume listening as soon as it ends.
+            play_task = asyncio.create_task(
+                self.tts.play_local(out_path, settings.tts.output_device_id),
+                name="local-play",
+            )
+
+        try:
+            if await self._wait_or_interrupt(wait_s):
+                if play_task is not None and not play_task.done():
+                    play_task.cancel()
+                    try:
+                        await play_task
+                    except asyncio.CancelledError:
+                        pass
+                await self.set_state("listening")
+                return
+        except asyncio.CancelledError:
+            if play_task is not None and not play_task.done():
+                play_task.cancel()
+                try:
+                    await play_task
+                except asyncio.CancelledError:
+                    pass
+            await self.set_state("listening")
+            raise
+
+        # Positive pad already baked into wait_s; if local play still running (early mic), leave it.
+        if play_task is not None and pad >= 0 and not play_task.done():
             try:
-                await self.tts.play_local(out_path, settings.tts.output_device_id)
+                await play_task
             except asyncio.CancelledError:
                 await self.set_state("listening")
                 raise
-            if pad > 0 and await self._wait_or_interrupt(pad):
-                await self.set_state("listening")
-                return
-        else:
-            # TD plays the wav; wait estimated duration (+ optional pad) then open mic.
-            if await self._wait_or_interrupt(max(0.05, duration + pad)):
-                await self.set_state("listening")
-                return
 
         self._last_activity_at = time.monotonic()
         await self.set_state("listening")

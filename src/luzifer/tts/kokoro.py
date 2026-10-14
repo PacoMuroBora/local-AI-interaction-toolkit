@@ -16,6 +16,7 @@ from luzifer.audio.envelope import peak_envelope_samples
 from luzifer.config import TtsSettings
 from luzifer.metrics import LEVEL_HZ
 from luzifer.models import piper_speaker_id
+from luzifer.tts.elevenlabs import ElevenLabsClient
 
 SynthResult = tuple[float, float, np.ndarray]
 
@@ -27,6 +28,7 @@ class TtsEngine:
         self._kokoro = None
         self._piper_cache: dict[str, object] = {}
         self._kokoro_key: tuple[str, str, str, str] | None = None
+        self.elevenlabs = ElevenLabsClient()
 
     @staticmethod
     def _onnx_providers(settings: TtsSettings) -> list[str]:
@@ -236,6 +238,8 @@ class TtsEngine:
 
     def preload_sync(self, settings: TtsSettings) -> None:
         """Load EN/DE backends so the first spoken line in either language isn't cold."""
+        if (settings.provider or "local").lower().strip() == "elevenlabs":
+            return
         for engine, voice in self._lang_targets(settings):
             if engine == "piper":
                 model_path = self._piper_path(voice)
@@ -253,12 +257,39 @@ class TtsEngine:
                 logger.warning("Kokoro preload failed: {}", exc)
 
     async def preload(self, settings: TtsSettings) -> None:
+        if (settings.provider or "local").lower().strip() == "elevenlabs":
+            return
         await asyncio.to_thread(self.preload_sync, settings)
+
+    async def _synthesize_elevenlabs(self, text: str, path: Path, settings: TtsSettings) -> SynthResult:
+        try:
+            t0 = time.perf_counter()
+            audio, sample_rate = await self.elevenlabs.synthesize_pcm(
+                text,
+                settings=settings.elevenlabs,
+                speed=settings.speed,
+            )
+            result = self._write_float_wav(path, audio, int(sample_rate))
+            logger.info(
+                "ElevenLabs synth {:.2f}s → {:.2f}s audio (voice={} model={})",
+                time.perf_counter() - t0,
+                result[0],
+                settings.elevenlabs.voice_id,
+                settings.elevenlabs.model_id,
+            )
+            return result
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ElevenLabs failed ({}), writing beep", exc)
+            return self._write_beep(path)
 
     async def synthesize(self, text: str, path: Path, settings: TtsSettings) -> SynthResult:
         """Write speech.wav and return (duration_s, peak_level, envelope)."""
         if not text.strip():
             return self._write_beep(path, duration_s=0.2)
+        if (settings.provider or "local").lower().strip() == "elevenlabs":
+            return await self._synthesize_elevenlabs(text, path, settings)
         return await asyncio.to_thread(self._synthesize_sync, text, path, settings)
 
     def _play_local_sync(self, path: Path, device_id: int | None) -> None:

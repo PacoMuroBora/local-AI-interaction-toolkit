@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
+from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -118,11 +119,25 @@ class VoiceActivityDetector:
                 logger.debug("Stream stop error: {}", exc)
         self._stream = None
         self._started = False
+        self._drain_queue()
+
+    def _drain_queue(self) -> None:
         while not self._q.empty():
             try:
                 self._q.get_nowait()
             except queue.Empty:
                 break
+
+    def _reset_vad_state(self) -> None:
+        """Clear Silero LSTM state so a long idle doesn't poison the next onset."""
+        if not self._use_silero or self._model is None:
+            return
+        reset = getattr(self._model, "reset_states", None)
+        if callable(reset):
+            try:
+                reset()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Silero reset_states failed: {}", exc)
 
     def _speech_prob(self, frame: np.ndarray) -> float:
         if self._use_silero and self._model is not None:
@@ -150,8 +165,17 @@ class VoiceActivityDetector:
             await asyncio.sleep(0.25)
             return None
 
+        # Drop PortAudio reopen junk, then start a clean pre-roll window.
+        self._drain_queue()
+        self._reset_vad_state()
+
         silence_limit = max(1, int(audio.silence_duration_ms / 1000 * audio.sample_rate / self.FRAME_SAMPLES))
         threshold = audio.vad_threshold
+        preroll_n = max(
+            0,
+            int(max(0, int(audio.vad_preroll_ms)) / 1000 * audio.sample_rate / self.FRAME_SAMPLES),
+        )
+        preroll: deque[np.ndarray] | None = deque(maxlen=preroll_n) if preroll_n > 0 else None
         chunks: list[np.ndarray] = []
         triggered = False
         silent_frames = 0
@@ -171,9 +195,15 @@ class VoiceActivityDetector:
 
                 prob = self._speech_prob(frame)
                 if not triggered:
+                    if preroll is not None:
+                        preroll.append(frame)
                     if prob >= threshold:
                         triggered = True
-                        chunks.append(frame)
+                        # Soft onset lives in the ring buffer — keep it for Whisper.
+                        if preroll:
+                            chunks.extend(preroll)
+                        else:
+                            chunks.append(frame)
                         silent_frames = 0
                         if on_speech is not None:
                             await on_speech(True)

@@ -14,9 +14,10 @@ venv/
 .env.local
 *.pem
 
-# Runtime outputs
+# Runtime outputs / secrets
 runtime/output/*
 !runtime/output/.gitkeep
+runtime/secrets.yaml
 
 # IDE / OS
 .idea/

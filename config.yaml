@@ -50,6 +50,7 @@ llm:
   num_ctx: 4096
   num_gpu: 99
 tts:
+  provider: elevenlabs
   engine: kokoro
   voice: am_onyx
   speed: 1.0
@@ -73,6 +74,12 @@ tts:
   speaker_by_lang:
     en: neutral
     de: angry
+  elevenlabs:
+    api_key: ''
+    voice_id: YgfD7xnpDbkAqDwKKlOz
+    model_id: eleven_flash_v2_5
+    stability: 0.5
+    similarity_boost: 0.75
 osc:
   host: 127.0.0.1
   port: 9000

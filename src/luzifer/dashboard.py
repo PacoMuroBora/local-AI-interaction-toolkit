@@ -169,7 +169,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Sample Rate</label><input id="audio.sample_rate" type="number" step="1" />
           <label>VAD Threshold</label><input id="audio.vad_threshold" type="number" step="0.05" />
           <label>Silence Duration (ms)</label><input id="audio.silence_duration_ms" type="number" step="50" />
+          <label>VAD Pre-roll (ms)</label><input id="audio.vad_preroll_ms" type="number" step="50" />
+          <p class="hint">Audio kept before VAD trips — stops clipping the first word after a long pause.</p>
           <label>Speaking Tail Pad (ms)</label><input id="audio.speaking_tail_pad_ms" type="number" step="50" />
+          <p class="hint">Added after TTS duration before mic reopens. Negative = open mic early.</p>
         </div>
         <div>
           <h2>Whisper STT</h2>
@@ -205,56 +208,85 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="grid">
         <div>
           <h2>TTS</h2>
-          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
-            <input id="tts.match_input_language" type="checkbox" style="width:auto" />
-            Match engine/voice to last input language (not history)
-          </label>
-          <div class="lang-cols">
-            <div class="lang-card">
-              <h3>English</h3>
-              <p class="hint">Used when Whisper reports <code>en</code></p>
-              <label>Engine</label>
-              <select id="tts.engine_by_lang.en">
-                <option value="kokoro">kokoro</option>
-                <option value="piper">piper</option>
-              </select>
-              <label>Voice</label>
-              <select id="tts.voice_by_lang.en"></select>
-              <div id="tts.speaker_wrap.en" hidden>
-                <label>Style</label>
-                <select id="tts.speaker_by_lang.en"></select>
-                <p class="hint">Neutral is the straight read. The others are acted.</p>
+          <label>Provider</label>
+          <select id="tts.provider">
+            <option value="local">Local (Kokoro / Piper)</option>
+            <option value="elevenlabs">ElevenLabs</option>
+          </select>
+          <div id="tts-local-block">
+            <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
+              <input id="tts.match_input_language" type="checkbox" style="width:auto" />
+              Match engine/voice to last input language (not history)
+            </label>
+            <div class="lang-cols">
+              <div class="lang-card">
+                <h3>English</h3>
+                <p class="hint">Used when Whisper reports <code>en</code></p>
+                <label>Engine</label>
+                <select id="tts.engine_by_lang.en">
+                  <option value="kokoro">kokoro</option>
+                  <option value="piper">piper</option>
+                </select>
+                <label>Voice</label>
+                <select id="tts.voice_by_lang.en"></select>
+                <div id="tts.speaker_wrap.en" hidden>
+                  <label>Style</label>
+                  <select id="tts.speaker_by_lang.en"></select>
+                  <p class="hint">Neutral is the straight read. The others are acted.</p>
+                </div>
+              </div>
+              <div class="lang-card">
+                <h3>German</h3>
+                <p class="hint">Used when Whisper reports <code>de</code></p>
+                <label>Engine</label>
+                <select id="tts.engine_by_lang.de">
+                  <option value="kokoro">kokoro</option>
+                  <option value="piper">piper</option>
+                </select>
+                <label>Voice</label>
+                <select id="tts.voice_by_lang.de"></select>
+                <div id="tts.speaker_wrap.de" hidden>
+                  <label>Style</label>
+                  <select id="tts.speaker_by_lang.de"></select>
+                  <p class="hint">Neutral is the straight read. The others are acted.</p>
+                </div>
               </div>
             </div>
-            <div class="lang-card">
-              <h3>German</h3>
-              <p class="hint">Used when Whisper reports <code>de</code></p>
-              <label>Engine</label>
-              <select id="tts.engine_by_lang.de">
-                <option value="kokoro">kokoro</option>
-                <option value="piper">piper</option>
-              </select>
-              <label>Voice</label>
-              <select id="tts.voice_by_lang.de"></select>
-              <div id="tts.speaker_wrap.de" hidden>
-                <label>Style</label>
-                <select id="tts.speaker_by_lang.de"></select>
-                <p class="hint">Neutral is the straight read. The others are acted.</p>
-              </div>
+            <label>Device</label>
+            <select id="tts.device">
+              <option value="cuda">cuda</option>
+              <option value="cpu">cpu</option>
+              <option value="dml">dml (DirectML)</option>
+            </select>
+            <label>Compute Type</label>
+            <select id="tts.compute_type">
+              <option value="float32">float32</option>
+              <option value="float16">float16</option>
+            </select>
+          </div>
+          <div id="tts-elevenlabs-block" hidden>
+            <label>API Key</label>
+            <input id="tts.elevenlabs.api_key" type="password" autocomplete="off" placeholder="xi-… (blank keeps stored key)" />
+            <p class="hint">Stored in <code>runtime/secrets.yaml</code>, not <code>config.yaml</code>.</p>
+            <label>Model</label>
+            <select id="tts.elevenlabs.model_id">
+              <option value="eleven_flash_v2_5">eleven_flash_v2_5 (fast)</option>
+              <option value="eleven_turbo_v2_5">eleven_turbo_v2_5</option>
+              <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
+            </select>
+            <label>Voice</label>
+            <select id="tts.elevenlabs.voice_id"></select>
+            <div style="display:flex;gap:.5rem;margin-top:.35rem;align-items:center">
+              <button id="fetch_elevenlabs_voices" class="secondary" type="button">Fetch voices</button>
+              <input id="tts.elevenlabs.voice_id_manual" placeholder="or paste voice_id" style="flex:1;margin:0" />
             </div>
+            <label>Stability</label>
+            <input id="tts.elevenlabs.stability" type="number" step="0.05" min="0" max="1" />
+            <label>Similarity Boost</label>
+            <input id="tts.elevenlabs.similarity_boost" type="number" step="0.05" min="0" max="1" />
           </div>
           <label>Speed</label><input id="tts.speed" type="number" step="0.05" />
-          <label>Device</label>
-          <select id="tts.device">
-            <option value="cuda">cuda</option>
-            <option value="cpu">cpu</option>
-            <option value="dml">dml (DirectML)</option>
-          </select>
-          <label>Compute Type</label>
-          <select id="tts.compute_type">
-            <option value="float32">float32</option>
-            <option value="float16">float16</option>
-          </select>
+          <p class="hint" id="tts-speed-hint-el" hidden>ElevenLabs clamps speed to ~0.7–1.2.</p>
           <label>WAV Output Path</label><input id="tts.output_path" />
           <label>Local Output Device</label><select id="tts.output_device_id"></select>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
@@ -262,7 +294,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             Monitor locally (play speech.wav on this machine)
           </label>
         </div>
-        <div>
+        <div id="tts-assets-col">
           <h2>TTS Assets</h2>
           <div id="tts-models" class="model-list"></div>
         </div>
@@ -454,10 +486,11 @@ const PATHS = [
   "system_prompt",
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
   "llm.num_ctx","llm.num_gpu",
-  "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.speaking_tail_pad_ms",
+  "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.vad_preroll_ms","audio.speaking_tail_pad_ms",
   "stt.model_size","stt.device","stt.compute_type","stt.language",
-  "tts.speed","tts.device","tts.compute_type","tts.output_path",
+  "tts.provider","tts.speed","tts.device","tts.compute_type","tts.output_path",
   "tts.engine_by_lang.en","tts.engine_by_lang.de",
+  "tts.elevenlabs.model_id","tts.elevenlabs.stability","tts.elevenlabs.similarity_boost",
   "osc.host","osc.port","osc.listen_host","osc.listen_port",
   "vision.ndi_source","vision.trigger","vision.idle_after_s","vision.speak_cooldown_s",
   "vision.interval_s","vision.change_threshold","vision.max_age_s","vision.model",
@@ -738,6 +771,65 @@ async function refreshNdiSources(){
   }
 }
 
+function syncTtsProviderUi(){
+  const provider = document.getElementById("tts.provider").value || "local";
+  const el = provider === "elevenlabs";
+  document.getElementById("tts-local-block").hidden = el;
+  document.getElementById("tts-elevenlabs-block").hidden = !el;
+  document.getElementById("tts-assets-col").hidden = el;
+  document.getElementById("tts-speed-hint-el").hidden = !el;
+}
+
+function fillElevenLabsVoiceSelect(voices, current){
+  const sel = document.getElementById("tts.elevenlabs.voice_id");
+  if (!sel) return;
+  const keep = current || sel.value || "";
+  sel.innerHTML = "";
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = voices.length ? "— select voice —" : "— fetch voices or paste id —";
+  sel.appendChild(blank);
+  for (const v of voices){
+    const opt = document.createElement("option");
+    opt.value = v.voice_id;
+    opt.textContent = v.name ? `${v.name} (${v.voice_id})` : v.voice_id;
+    sel.appendChild(opt);
+  }
+  if (keep && ![...sel.options].some(o => o.value === keep)){
+    const opt = document.createElement("option");
+    opt.value = keep;
+    opt.textContent = keep;
+    sel.appendChild(opt);
+  }
+  if (keep) sel.value = keep;
+  document.getElementById("tts.elevenlabs.voice_id_manual").value = keep || "";
+}
+
+async function fetchElevenLabsVoices(){
+  const key = document.getElementById("tts.elevenlabs.api_key").value.trim();
+  setStatus("fetching ElevenLabs voices…");
+  try {
+    const res = await fetch("/api/tts/elevenlabs/voices", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({api_key: key || null}),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      setStatus(data.detail || data.error || "voice fetch failed");
+      return;
+    }
+    const voices = data.voices || [];
+    const current = document.getElementById("tts.elevenlabs.voice_id").value
+      || document.getElementById("tts.elevenlabs.voice_id_manual").value
+      || "";
+    fillElevenLabsVoiceSelect(voices, current);
+    setStatus(voices.length ? `${voices.length} ElevenLabs voices` : "no voices returned");
+  } catch (e) {
+    setStatus("voice fetch failed");
+  }
+}
+
 async function loadConfig(){
   const cfg = await (await fetch("/api/config")).json();
   for (const p of PATHS){
@@ -748,6 +840,16 @@ async function loadConfig(){
   }
   setMonitorLocal(!!cfg.tts.monitor_local);
   document.getElementById("tts.match_input_language").checked = !!cfg.tts.match_input_language;
+  const elCfg = (cfg.tts && cfg.tts.elevenlabs) || {};
+  // Never put the real key in the password field from GET — show empty, blank keeps stored.
+  document.getElementById("tts.elevenlabs.api_key").value = "";
+  document.getElementById("tts.elevenlabs.api_key").placeholder =
+    elCfg.api_key ? "•••••••• (blank keeps stored key)" : "xi-… (save to store key)";
+  fillElevenLabsVoiceSelect(
+    elCfg.voice_id ? [{voice_id: elCfg.voice_id, name: elCfg.voice_id}] : [],
+    elCfg.voice_id || ""
+  );
+  syncTtsProviderUi();
   const v = cfg.vision || {};
   document.getElementById("vision.enabled").checked = !!v.enabled;
   document.getElementById("vision.inject_context").checked = v.inject_context !== false;
@@ -770,6 +872,7 @@ async function collectConfig(){
   set(cfg, "tts.output_device_id", document.getElementById("tts.output_device_id").value);
   cfg.tts.monitor_local = document.getElementById("tts.monitor_local").checked;
   cfg.tts.match_input_language = document.getElementById("tts.match_input_language").checked;
+  cfg.tts.provider = document.getElementById("tts.provider").value || "local";
   cfg.tts.engine_by_lang = cfg.tts.engine_by_lang || {};
   cfg.tts.voice_by_lang = cfg.tts.voice_by_lang || {};
   cfg.tts.engine_by_lang.en = document.getElementById("tts.engine_by_lang.en").value || "kokoro";
@@ -784,6 +887,16 @@ async function collectConfig(){
   // Legacy single fields track English (fallback when match is off).
   cfg.tts.engine = cfg.tts.engine_by_lang.en;
   cfg.tts.voice = cfg.tts.voice_by_lang.en;
+  cfg.tts.elevenlabs = cfg.tts.elevenlabs || {};
+  const typedKey = document.getElementById("tts.elevenlabs.api_key").value.trim();
+  // Blank password keeps whatever the server already has (ConfigStore also preserves).
+  cfg.tts.elevenlabs.api_key = typedKey;
+  cfg.tts.elevenlabs.model_id = document.getElementById("tts.elevenlabs.model_id").value || "eleven_flash_v2_5";
+  const voiceSel = document.getElementById("tts.elevenlabs.voice_id").value.trim();
+  const voiceManual = document.getElementById("tts.elevenlabs.voice_id_manual").value.trim();
+  cfg.tts.elevenlabs.voice_id = voiceSel || voiceManual;
+  cfg.tts.elevenlabs.stability = Number(document.getElementById("tts.elevenlabs.stability").value);
+  cfg.tts.elevenlabs.similarity_boost = Number(document.getElementById("tts.elevenlabs.similarity_boost").value);
   const lang = document.getElementById("stt.language").value;
   cfg.stt.language = lang === "" ? null : lang;
   cfg.vision = cfg.vision || {};
@@ -808,10 +921,30 @@ async function saveMonitorLocal(on){
 
 document.getElementById("direct_playback").onchange = (ev) => saveMonitorLocal(ev.target.checked);
 document.getElementById("tts.monitor_local").onchange = (ev) => saveMonitorLocal(ev.target.checked);
+document.getElementById("tts.provider").onchange = () => syncTtsProviderUi();
+document.getElementById("fetch_elevenlabs_voices").onclick = () => fetchElevenLabsVoices();
+document.getElementById("tts.elevenlabs.voice_id").onchange = (ev) => {
+  document.getElementById("tts.elevenlabs.voice_id_manual").value = ev.target.value || "";
+};
+document.getElementById("tts.elevenlabs.voice_id_manual").onchange = (ev) => {
+  const id = (ev.target.value || "").trim();
+  const sel = document.getElementById("tts.elevenlabs.voice_id");
+  if (id && ![...sel.options].some(o => o.value === id)){
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = id;
+    sel.appendChild(opt);
+  }
+  if (id) sel.value = id;
+};
 
 document.getElementById("save").onclick = async () => {
   const cfg = await collectConfig();
   const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
+  if (res.ok) {
+    document.getElementById("tts.elevenlabs.api_key").value = "";
+    document.getElementById("tts.elevenlabs.api_key").placeholder = "•••••••• (blank keeps stored key)";
+  }
   setStatus(res.ok ? "saved live" : "save failed");
 };
 document.getElementById("tts.engine_by_lang.en").onchange = () => {
@@ -1043,6 +1176,10 @@ class TtsDownloadBody(BaseModel):
     id: str = Field(min_length=1)
 
 
+class ElevenLabsVoicesBody(BaseModel):
+    api_key: str | None = None
+
+
 def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
     app = FastAPI(title="Local AI Interaction Toolkit", version="0.1.0")
     hub = DashboardHub()
@@ -1219,6 +1356,19 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
 
         _track(asyncio.create_task(_job()))
         return {"status": "started"}
+
+    @app.post("/api/tts/elevenlabs/voices")
+    async def elevenlabs_voices(body: ElevenLabsVoicesBody) -> dict[str, Any]:
+        settings = await store.get()
+        key = (body.api_key or "").strip() or (settings.tts.elevenlabs.api_key or "").strip()
+        if not key:
+            return {"voices": [], "error": "no API key (type one or Save first)"}
+        try:
+            voices = await pipeline.tts.elevenlabs.list_voices(key)
+            return {"voices": voices}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ElevenLabs voices list failed: {}", exc)
+            return {"voices": [], "error": str(exc)}
 
     @app.post("/api/debug/say")
     async def debug_say(body: TextBody) -> dict[str, str]:

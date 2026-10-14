@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = ROOT_DIR / "config.yaml"
+DEFAULT_SECRETS_PATH = ROOT_DIR / "runtime" / "secrets.yaml"
 
 
 class AudioSettings(BaseModel):
@@ -21,6 +22,9 @@ class AudioSettings(BaseModel):
     channels: int = 1
     vad_threshold: float = 0.5
     silence_duration_ms: int = 700
+    # Keep this many ms of audio before VAD trips so soft onsets aren't clipped.
+    vad_preroll_ms: int = 500
+    # Extra wait after TTS duration before mic reopen. Negative = open mic early.
     speaking_tail_pad_ms: int = 50
 
 
@@ -45,7 +49,19 @@ class LlmSettings(BaseModel):
     num_gpu: int = 99
 
 
+class ElevenLabsSettings(BaseModel):
+    """Cloud TTS via ElevenLabs. api_key lives in runtime/secrets.yaml, not config.yaml."""
+
+    api_key: str = ""
+    voice_id: str = ""
+    model_id: str = "eleven_flash_v2_5"
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+
+
 class TtsSettings(BaseModel):
+    # local = Kokoro/Piper; elevenlabs = cloud API → same speech.wav
+    provider: str = "local"
     engine: str = "kokoro"
     voice: str = "af_heart"
     speed: float = 1.0
@@ -91,6 +107,7 @@ class TtsSettings(BaseModel):
             "de": "neutral",
         }
     )
+    elevenlabs: ElevenLabsSettings = Field(default_factory=ElevenLabsSettings)
 
 
 class OscSettings(BaseModel):
@@ -185,18 +202,52 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def load_settings(path: Path | None = None) -> AppSettings:
+def _merge_secrets(raw: dict[str, Any], secrets_path: Path) -> dict[str, Any]:
+    """Overlay gitignored secrets (e.g. ElevenLabs api_key) onto config.yaml data."""
+    if not secrets_path.exists():
+        return raw
+    secrets = _load_yaml(secrets_path)
+    if not secrets:
+        return raw
+    tts = dict(raw.get("tts") or {})
+    el = dict(tts.get("elevenlabs") or {})
+    secret_el = (secrets.get("tts") or {}).get("elevenlabs") or {}
+    if isinstance(secret_el, dict):
+        key = str(secret_el.get("api_key") or "").strip()
+        if key:
+            el["api_key"] = key
+    tts["elevenlabs"] = el
+    out = dict(raw)
+    out["tts"] = tts
+    return out
+
+
+def _write_secrets(api_key: str, secrets_path: Path) -> None:
+    secrets_path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {"tts": {"elevenlabs": {"api_key": api_key}}}
+    with secrets_path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(payload, fh, sort_keys=False, allow_unicode=True)
+
+
+def load_settings(path: Path | None = None, secrets_path: Path | None = None) -> AppSettings:
     config_path = path or DEFAULT_CONFIG_PATH
     raw = _load_yaml(config_path)
+    raw = _merge_secrets(raw, secrets_path or DEFAULT_SECRETS_PATH)
     return AppSettings(**raw)
 
 
 class ConfigStore:
     """Thread/async-safe live settings with YAML persistence."""
 
-    def __init__(self, settings: AppSettings, path: Path | None = None) -> None:
+    def __init__(
+        self,
+        settings: AppSettings,
+        path: Path | None = None,
+        secrets_path: Path | None = None,
+    ) -> None:
         self._settings = settings
         self._path = path or DEFAULT_CONFIG_PATH
+        self._secrets_path = secrets_path or DEFAULT_SECRETS_PATH
         self._lock = asyncio.Lock()
         self.revision = 0
 
@@ -210,7 +261,11 @@ class ConfigStore:
 
     async def update(self, incoming: AppSettings) -> AppSettings:
         async with self._lock:
-            self._settings = incoming.model_copy(deep=True)
+            merged = incoming.model_copy(deep=True)
+            # Blank password field on save keeps the previously stored key.
+            if not (merged.tts.elevenlabs.api_key or "").strip():
+                merged.tts.elevenlabs.api_key = self._settings.tts.elevenlabs.api_key
+            self._settings = merged
             self.revision += 1
             self._persist(self._settings)
             logger.info("Config updated (revision={})", self.revision)
@@ -218,6 +273,12 @@ class ConfigStore:
 
     def _persist(self, settings: AppSettings) -> None:
         payload = settings.model_dump(mode="python")
+        api_key = str(payload.get("tts", {}).get("elevenlabs", {}).get("api_key") or "")
+        # Never write the API key into git-tracked config.yaml.
+        tts = payload.setdefault("tts", {})
+        el = tts.setdefault("elevenlabs", {})
+        el["api_key"] = ""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._path.open("w", encoding="utf-8") as fh:
             yaml.safe_dump(payload, fh, sort_keys=False, allow_unicode=True)
+        _write_secrets(api_key, self._secrets_path)
