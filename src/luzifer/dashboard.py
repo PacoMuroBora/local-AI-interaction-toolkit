@@ -348,7 +348,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <option value="external">external (OSC from TD)</option>
             <option value="local_idle">local_idle (backend silence timer)</option>
           </select>
-          <p class="hint">External: TD decides idle + presence, then pulses <code>/ai/in/vision</code>. Local idle: backend captions when quiet.</p>
+          <p class="hint">External: TD pulses <code>/ai/in/vision</code> to caption and speak. Local idle: sample every Sample Interval while listening and during playback. No vision model during thinking or TTS synthesis. Speak only after Idle After, then wait Speak Cooldown.</p>
           <label>Idle After (s)</label><input id="vision.idle_after_s" type="number" step="0.5" />
           <label>Speak Cooldown (s)</label><input id="vision.speak_cooldown_s" type="number" step="0.5" />
           <label>Sample Interval (s)</label><input id="vision.interval_s" type="number" step="0.5" />
@@ -386,6 +386,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div>
           <h2>Caption Prompt</h2>
           <textarea id="vision.prompt" rows="8" style="min-height:10rem"></textarea>
+          <h2 style="margin-top:1rem">Idle Comment Prompt</h2>
+          <p class="hint">Replaces the main system prompt when Luzifer speaks on its own. Visitor replies keep the main prompt, plus the latest caption as a private fact.</p>
+          <textarea id="vision.idle_prompt" rows="8" style="min-height:10rem"></textarea>
         </div>
         <div>
           <h2>Analysis Result</h2>
@@ -494,7 +497,8 @@ const PATHS = [
   "osc.host","osc.port","osc.listen_host","osc.listen_port",
   "vision.ndi_source","vision.trigger","vision.idle_after_s","vision.speak_cooldown_s",
   "vision.interval_s","vision.change_threshold","vision.max_age_s","vision.model",
-  "vision.jpeg_max_edge","vision.num_predict","vision.num_ctx","vision.num_gpu","vision.num_batch","vision.prompt"
+  "vision.jpeg_max_edge","vision.num_predict","vision.num_ctx","vision.num_gpu","vision.num_batch","vision.prompt",
+  "vision.idle_prompt"
 ];
 let KOKORO_VOICES = [];
 let PIPER_VOICES = [];

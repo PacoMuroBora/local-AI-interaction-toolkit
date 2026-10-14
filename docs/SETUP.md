@@ -90,10 +90,10 @@ Requires the [NDI runtime](https://ndi.video/) (same stack TD uses) plus `uv syn
 1. In TD, add an **NDI Out TOP** named e.g. `LuziferCam` (match `vision.ndi_source`).
 2. Dashboard **Vision** tab: enable, pick source, leave **trigger = external**.
 3. TD pulses `/ai/in/vision 1` when idle + presence say so (blob/depth on your side).
-4. Or set **trigger = local_idle** for a backend silence timer (no local presence detector).
-5. **Analyze** captions only; **Analyze + Comment** captions and speaks. Both force-queue and ignore the trigger toggle.
+4. Or set **trigger = local_idle**. The backend samples the camera every `vision.interval_s` while it is listening and while a line is playing. Unchanged frames keep the current caption and do not call the vision model. A spoken aside waits until the room has been quiet for `vision.idle_after_s`, then respects `vision.speak_cooldown_s`. The vision model does not run during STT, thinking, or TTS synthesis.
+5. **Analyze** captions only; **Analyze + Comment** captions and speaks. Both force a grab and ignore the trigger toggle.
 
-Captions go to `/ai/vision_text` and the dashboard footer. With `vision.inject_context`, the next visitor turn gets the caption on the system prompt (not history). The chat model stays text-only — frames never enter `llm.model`.
+Captions go to `/ai/vision_text` and the dashboard footer. With `vision.inject_context`, the next visitor turn gets the caption on the visitor system prompt (not history). Spoken asides use `vision.idle_prompt` instead of that prompt, and they do not see chat history. The chat model stays text-only — frames never enter `llm.model`.
 
 ### Whisper (`--extra stt`)
 

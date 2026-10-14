@@ -34,15 +34,25 @@ class ObservationStore:
         self._latest = obs
         return obs
 
+    def touch(self) -> bool:
+        """Scene unchanged: keep the caption, restart its age. No VLM call."""
+        obs = self._latest
+        if obs is None or not obs.text:
+            return False
+        obs.captured_at = time.monotonic()
+        return True
+
     def context_block(self, max_age_s: float) -> str:
+        """Private fact for a visitor reply. Not a cue to narrate the room."""
         obs = self._latest
         if obs is None or not obs.text:
             return ""
         if max_age_s > 0 and obs.age > max_age_s:
             return ""
         return (
-            "\n\nWhat you currently see (fact, not the visitor speaking; "
-            "do not invent beyond it):\n"
+            "\n\nWhat you currently see (private fact, not someone speaking). "
+            "Use at most one detail, and only if it serves this reply. "
+            "Do not narrate the room or invent beyond it:\n"
             f"{obs.text}"
         )
 

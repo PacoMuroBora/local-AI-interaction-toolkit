@@ -7,6 +7,7 @@ import base64
 import io
 import re
 import time
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -139,8 +140,17 @@ class VisionOllama:
         settings: VisionSettings,
         *,
         base_url: str,
-    ) -> str:
+        proceed: Callable[[], bool] | None = None,
+    ) -> str | None:
+        """Caption a still. None means skipped so the talker can have the runner.
+
+        The lock is taken before `proceed` runs. A caption that already started
+        cannot be cancelled; overlapping /api/chat calls wedge the Ollama runner.
+        """
         async with self._lock:
+            if proceed is not None and not proceed():
+                logger.info("Vision caption skipped (talker busy)")
+                return None
             return await self._describe(jpeg, settings, base_url=base_url)
 
     async def _describe(

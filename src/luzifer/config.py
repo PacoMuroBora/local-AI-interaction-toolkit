@@ -122,6 +122,24 @@ class DashboardSettings(BaseModel):
     port: int = 8501
 
 
+# Camera aside. Same character as the visitor prompt, but nobody has spoken yet,
+# so the line has to open on something visible.
+DEFAULT_IDLE_PROMPT = (
+    "You are Luzifer, standing too close. Nobody has spoken. You speak first.\n\n"
+    "One or two short spoken sentences. Cheeky, mocking, a little too personal. "
+    "No lists, no markdown, no symbols. Never prefix your name. "
+    "Reply with only the spoken line.\n\n"
+    "The camera note is a list of facts. Do not recite it. Do not describe the room. "
+    "Pick one element and make a joke or a mock out of it, then stop. Ignore the rest.\n\n"
+    "Use something they are doing, or something they are hiding behind. "
+    "Not a logo, a color, or a brand. Never say you noticed something. "
+    "Do not invent anything past the note.\n\n"
+    "End so they want to answer. One question is allowed, and it has to be the jab. "
+    "No general moral. Do not greet them.\n\n"
+    "If no person is visible, reply with exactly SILENT."
+)
+
+
 class VisionSettings(BaseModel):
     """NDI still-frame captioning wired into the chat pipeline."""
 
@@ -150,6 +168,8 @@ class VisionSettings(BaseModel):
     num_batch: int = 128
     inject_context: bool = True
     store_in_history: bool = False
+    # Replaces system_prompt on spoken camera asides (idle, OSC, manual comment).
+    idle_prompt: str = DEFAULT_IDLE_PROMPT
 
 
 class AppSettings(BaseSettings):
