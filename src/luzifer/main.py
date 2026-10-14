@@ -74,7 +74,7 @@ async def _run() -> None:
     for task in pending:
         task.cancel()
     await asyncio.gather(pipeline_task, server_task, return_exceptions=True)
-    logger.info("Luzifer stopped")
+    logger.info("Toolkit stopped")
 
 
 def main() -> None:

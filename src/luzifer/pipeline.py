@@ -14,7 +14,7 @@ from loguru import logger
 
 from luzifer.audio.vad import VoiceActivityDetector
 from luzifer.config import ConfigStore, TtsSettings, VisionSettings
-from luzifer.llm.ollama import ChatMessage, OllamaEngine
+from luzifer.llm.ollama import ChatMessage, OllamaEngine, models_match
 from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
 from luzifer.stt.whisper import WhisperEngine
@@ -24,7 +24,7 @@ from luzifer.vision.ndi import NdiGrabber
 from luzifer.vision.observation import ObservationStore
 from luzifer.vision.ollama import VisionOllama, is_usable_caption
 
-StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
+StateName = Literal["loading", "listening", "stt", "thinking", "synthesizing", "speaking"]
 StateListener = Callable[[StateName, str, str], Awaitable[None] | None]
 CommandKind = Literal["say", "speak", "reset", "interrupt", "listen", "vision"]
 
@@ -112,20 +112,24 @@ class Pipeline:
         self.store = store
         self.vad = vad or VoiceActivityDetector()
         self.stt = stt or WhisperEngine()
-        self.llm = llm or OllamaEngine()
         self.tts = tts or TtsEngine()
+        # One Ollama runner. Chat and vision must never load or generate at the same time.
+        self._ollama_lock = asyncio.Lock()
+        self.llm = llm or OllamaEngine(self._ollama_lock)
+        self.llm._lock = self._ollama_lock
         settings = store.settings
         self.osc = osc or TouchDesignerOscClient(settings.osc.host, settings.osc.port)
         self.metrics = MetricsStore()
         self.vad.metrics = self.metrics
-        self.state: StateName = "listening"
+        self.state: StateName = "loading"
+        self._models_ready = asyncio.Event()
         self.last_user_text = ""
         self.last_ai_text = ""
         # Language of the most recent user input only (Whisper or text heuristic).
         self.last_language: str | None = None
         self.observations = ObservationStore()
         self._ndi = NdiGrabber()
-        self._vision_llm = VisionOllama()
+        self._vision_llm = VisionOllama(self._ollama_lock)
         self._running = False
         self._mic_enabled = True
         self._listeners: list[StateListener] = []
@@ -248,12 +252,14 @@ class Pipeline:
 
     async def analyze_vision(self) -> str:
         """Dashboard CTA: caption now. Does not touch the mic."""
+        await self._models_ready.wait()
         settings = await self.store.get()
         logger.info("Vision analyze CTA (source={!r})", settings.vision.ndi_source)
         return await self._caption_frame(settings.vision, force=True) or ""
 
     async def comment_vision(self) -> str:
         """Dashboard CTA: caption + spoken reaction. Returns caption."""
+        await self._models_ready.wait()
         settings = await self.store.get()
         logger.info("Vision comment CTA (source={!r})", settings.vision.ndi_source)
         text = await self._caption_frame(settings.vision, force=True) or ""
@@ -268,6 +274,7 @@ class Pipeline:
 
     async def request_vision_from_osc(self) -> None:
         """TD pulse: analyze + comment when trigger=external."""
+        await self._models_ready.wait()
         settings = await self.store.get()
         if not settings.vision.enabled:
             logger.info("OSC vision ignored (vision.enabled=false)")
@@ -325,17 +332,80 @@ class Pipeline:
             if self._active_task is task:
                 self._active_task = None
 
+    async def _boot(self, message: str) -> None:
+        self.last_ai_text = message
+        logger.info(message)
+        if self.state != "loading":
+            await self.set_state("loading")
+            return
+        await self.osc.send_state("loading")
+        await self._publish_flags(user_speaking=False)
+        await self._notify()
+
+    async def _ensure_chat_resident(self, settings: Any) -> None:
+        """Vision warmup can evict the talker when Ollama only has one model slot."""
+        llm = settings.llm
+        try:
+            loaded = await self.llm.loaded_models(llm.base_url)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not list resident Ollama models: {}", exc)
+            return
+        logger.info("Ollama resident: {}", loaded)
+        if any(models_match(llm.model, name) for name in loaded):
+            return
+        logger.warning(
+            "Chat model {} left VRAM when {} loaded. Ollama is keeping one model. "
+            "Set OLLAMA_MAX_LOADED_MODELS=2 and restart Ollama so both stay hot. "
+            "Re-pinning the chat model; vision will load on demand, one call at a time.",
+            llm.model,
+            settings.vision.model,
+        )
+        await self._boot(f"loading {llm.model}")
+        await self.llm.warmup(llm)
+
+    async def _warmup(self, settings: Any) -> None:
+        """TTS → Whisper → chat → vision, strictly one GPU load at a time.
+
+        The mic and the vision loop stay down until this returns. Dashboard vision
+        CTAs wait on `_models_ready` so they can't sneak a second Ollama load in
+        between steps.
+        """
+        try:
+            await self._boot("loading TTS")
+            await self.tts.preload(settings.tts)
+
+            stt = settings.stt
+            await self._boot(f"loading whisper {stt.model_size}")
+            await self.stt.preload(stt)
+
+            await self._boot(f"loading {settings.llm.model}")
+            chat_ok = await self.llm.warmup(settings.llm)
+
+            vision = settings.vision
+            if vision.enabled and vision.model.strip():
+                await self._boot(f"loading {vision.model}")
+                await self._vision_llm.warmup(vision, base_url=settings.llm.base_url)
+                if chat_ok:
+                    await self._ensure_chat_resident(settings)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Warmup failed: {}", exc)
+        finally:
+            self.last_ai_text = ""
+            # Idle timer starts when the system is actually up, not at process start.
+            self._last_activity_at = time.monotonic()
+            self._models_ready.set()
+
     async def run(self) -> None:
         self._running = True
         try:
             settings = await self.store.get()
             self.osc.reconfigure(settings.osc.host, settings.osc.port)
             await self.osc.clear_play(force=True)
-            await self.tts.preload(settings.tts)
+            await self._warmup(settings)
             await self.set_state("listening")
             self._level_task = asyncio.create_task(self._stream_levels(), name="levels")
             self._vision_task = asyncio.create_task(self._vision_loop(), name="vision")
-            logger.info("Pipeline started")
+            logger.info("Pipeline ready")
 
             while self._running:
                 try:
@@ -347,6 +417,7 @@ class Pipeline:
                     await self.set_state("listening")
                     await asyncio.sleep(0.5)
         finally:
+            self._models_ready.set()
             self._running = False
             self.vad.stop_stream()
             self.metrics.disarm_output()

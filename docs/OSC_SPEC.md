@@ -1,33 +1,33 @@
 # OSC specification
 
-Bidirectional UDP OSC between Luzifer and TouchDesigner.
+Bidirectional UDP OSC between the toolkit and TouchDesigner. The address root is `/ai`. The installation name (Luzifer, or whatever `name` is set to) is not part of the protocol.
 
 | Direction | Default | Operator |
 |-----------|---------|----------|
-| Luzifer → TD | `127.0.0.1:9000` | TD **OSC In DAT** |
-| TD → Luzifer | `127.0.0.1:9001` | TD **OSC Out DAT** |
+| Toolkit → TD | `127.0.0.1:9000` | TD **OSC In DAT** |
+| TD → Toolkit | `127.0.0.1:9001` | TD **OSC Out DAT** |
 
-## Outbound (Luzifer → TouchDesigner)
+## Outbound (toolkit → TouchDesigner)
 
 Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 
 | Address | Type | Example | TouchDesigner behavior |
 |---------|------|---------|------------------------|
-| `/luzifer/state` | string | `listening` | DAT only. Values: `listening`, `stt`, `thinking`, `synthesizing`, `speaking`. |
-| `/luzifer/user_text` | string | `Who are you?` | DAT only. Visitor transcript. |
-| `/luzifer/ai_text` | string | `I am Luzifer…` | DAT only. AI reply. |
-| `/luzifer/listening` | int | `1` or `0` | CHOP. `1` while the pipeline is in `listening`. |
-| `/luzifer/user_speaking` | int | `1` or `0` | CHOP. `1` only while VAD hears the visitor. `0` the moment they stop, and whenever state is not `listening`. |
-| `/luzifer/stt` | int | `1` or `0` | CHOP. `1` while Whisper is transcribing. |
-| `/luzifer/thinking` | int | `1` or `0` | CHOP. `1` while the LLM is generating. |
-| `/luzifer/synthesizing` | int | `1` or `0` | CHOP. `1` while TTS is writing `speech.wav`. |
-| `/luzifer/ai_speaking` | int | `1` or `0` | CHOP. `1` during playback + tail (after the file exists). |
-| `/luzifer/play` | int | `1` then `0` | CHOP. `1` once `speech.wav` is written. Back to `0` when speaking ends, so the next line is a rising edge. |
-| `/luzifer/in_level` | float | `0.0`–`1.0` | CHOP. Mic peak, 30 Hz. `0` within ~120 ms of the mic closing. |
-| `/luzifer/out_level` | float | `0.0`–`1.0` | CHOP. Dry-wav peak envelope, 30 Hz, clocked from the `play` edge. `0` while synthesizing and after the file ends. Not the post-VST level. |
-| `/luzifer/vision_text` | string | `A person stands…` | DAT. Latest NDI still caption from the vision VLM. |
-| `/luzifer/vision` | int | `1` then `0` | CHOP. Pulse on each new caption (rising edge). |
-| `/luzifer/vision_active` | int | `1` or `0` | CHOP. `1` while the vision VLM HTTP call is in flight. |
+| `/ai/state` | string | `listening` | DAT only. Values: `loading`, `listening`, `stt`, `thinking`, `synthesizing`, `speaking`. `loading` is startup warmup; `/ai/listening` stays `0`. |
+| `/ai/user_text` | string | `Who are you?` | DAT only. Visitor transcript. |
+| `/ai/ai_text` | string | `Here I am.` | DAT only. AI reply. |
+| `/ai/listening` | int | `1` or `0` | CHOP. `1` while the pipeline is in `listening`. |
+| `/ai/user_speaking` | int | `1` or `0` | CHOP. `1` only while VAD hears the visitor. `0` the moment they stop, and whenever state is not `listening`. |
+| `/ai/stt` | int | `1` or `0` | CHOP. `1` while Whisper is transcribing. |
+| `/ai/thinking` | int | `1` or `0` | CHOP. `1` while the LLM is generating. |
+| `/ai/synthesizing` | int | `1` or `0` | CHOP. `1` while TTS is writing `speech.wav`. |
+| `/ai/ai_speaking` | int | `1` or `0` | CHOP. `1` during playback + tail (after the file exists). |
+| `/ai/play` | int | `1` then `0` | CHOP. `1` once `speech.wav` is written. Back to `0` when speaking ends, so the next line is a rising edge. |
+| `/ai/in_level` | float | `0.0`–`1.0` | CHOP. Mic peak, 30 Hz. `0` within ~120 ms of the mic closing. |
+| `/ai/out_level` | float | `0.0`–`1.0` | CHOP. Dry-wav peak envelope, 30 Hz, clocked from the `play` edge. `0` while synthesizing and after the file ends. Not the post-VST level. |
+| `/ai/vision_text` | string | `A person stands…` | DAT. Latest NDI still caption from the vision VLM. |
+| `/ai/vision` | int | `1` then `0` | CHOP. Pulse on each new caption (rising edge). |
+| `/ai/vision_active` | int | `1` or `0` | CHOP. `1` while the vision VLM HTTP call is in flight. |
 
 Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all six addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
 
@@ -37,37 +37,37 @@ Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often neve
 
 Typical turn:
 
-1. `/luzifer/listening` → `1`, other flags → `0`
-2. Visitor starts talking → `/luzifer/user_speaking` → `1`
-3. Visitor stops → `/luzifer/user_speaking` → `0`, `/luzifer/stt` → `1`, `/luzifer/listening` → `0`
-4. `/luzifer/user_text`, then `/luzifer/thinking` → `1`, `/luzifer/stt` → `0`
-5. `/luzifer/ai_text`, then `/luzifer/synthesizing` → `1`, `/luzifer/thinking` → `0`
-6. File ready → `/luzifer/ai_speaking` → `1`, `/luzifer/synthesizing` → `0`, `/luzifer/play` → `1`, `/luzifer/out_level` starts
-7. After wav duration + tail → `/luzifer/play` → `0`, `/luzifer/out_level` → `0`, `/luzifer/ai_speaking` → `0`, `/luzifer/listening` → `1`
+1. `/ai/listening` → `1`, other flags → `0`
+2. Visitor starts talking → `/ai/user_speaking` → `1`
+3. Visitor stops → `/ai/user_speaking` → `0`, `/ai/stt` → `1`, `/ai/listening` → `0`
+4. `/ai/user_text`, then `/ai/thinking` → `1`, `/ai/stt` → `0`
+5. `/ai/ai_text`, then `/ai/synthesizing` → `1`, `/ai/thinking` → `0`
+6. File ready → `/ai/ai_speaking` → `1`, `/ai/synthesizing` → `0`, `/ai/play` → `1`, `/ai/out_level` starts
+7. After wav duration + tail → `/ai/play` → `0`, `/ai/out_level` → `0`, `/ai/ai_speaking` → `0`, `/ai/listening` → `1`
 
 ### OSC In CHOP
 
-Port `9000`. Strings never become channels; that's why the CHOP in the screenshot only showed `luzifer/play`. After a restart the int channels show up as:
+Port `9000`. Strings never become channels; that's why the CHOP in the screenshot only showed `ai/play`. After a restart the int channels show up as:
 
-- `luzifer/listening`
-- `luzifer/user_speaking`
-- `luzifer/stt`
-- `luzifer/thinking`
-- `luzifer/synthesizing`
-- `luzifer/ai_speaking`
-- `luzifer/play`
-- `luzifer/in_level`
-- `luzifer/out_level`
+- `ai/listening`
+- `ai/user_speaking`
+- `ai/stt`
+- `ai/thinking`
+- `ai/synthesizing`
+- `ai/ai_speaking`
+- `ai/play`
+- `ai/in_level`
+- `ai/out_level`
 
 ```python
-op('oscin1')['luzifer/thinking']
+op('oscin1')['ai/thinking']
 ```
 
 Rename CHOP, from → to:
 
 ```
-luzifer/listening luzifer/user_speaking luzifer/stt luzifer/thinking luzifer/synthesizing luzifer/ai_speaking luzifer/play
-listening user stt thinking synth ai play
+ai/listening ai/user_speaking ai/stt ai/thinking ai/synthesizing ai/ai_speaking ai/play
+listening user stt thinking synth speaking play
 ```
 
 Export the bool channels straight onto blends.
@@ -96,7 +96,7 @@ CHOP Execute on the OSC In (or the rename). Enable **Off to On** and **On to Off
 
 ```python
 def onOffToOn(channel, sampleIndex, val, prev):
-    if channel.name not in ('luzifer/play', 'play'):
+    if channel.name not in ('ai/play', 'play'):
         return
     a = op('audiofilein1')
     a.par.play = False
@@ -110,43 +110,43 @@ def onOffToOn(channel, sampleIndex, val, prev):
     )
 
 def onOnToOff(channel, sampleIndex, val, prev):
-    if channel.name not in ('luzifer/play', 'play'):
+    if channel.name not in ('ai/play', 'play'):
         return
     op('audiofilein1').par.play = False
 ```
 
 Keep the OSC In DAT for `user_text`, `ai_text`, and the `state` string. On Windows both operators can share port `9000`. If one of them stays empty, only one bind won — leave the CHOP on `9000`.
 
-## Inbound (TouchDesigner → Luzifer)
+## Inbound (TouchDesigner → toolkit)
 
 Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message per row (address + argument).
 
 | Address | Arg | What it does |
 |---------|-----|--------------|
-| `/luzifer/in/say` | string | Visitor line. Skips mic/STT. Runs LLM + TTS + `/luzifer/play`. Appends chat history. |
-| `/luzifer/in/speak` | string | Say this line with TTS only. No LLM, no history. |
-| `/luzifer/in/reset` | int `1` | Clear chat history and empty transcript fields. |
-| `/luzifer/in/interrupt` | int `1` | Abort think/speak, return to `listening`. |
-| `/luzifer/in/listen` | int `1` or `0` | Unmute (`1`) or mute (`0`) the microphone. |
-| `/luzifer/in/vision` | int `1` | Grab NDI still, caption, speak a reaction. Only when `vision.enabled` and `vision.trigger=external`. TD should gate on idle + presence. |
+| `/ai/in/say` | string | Visitor line. Skips mic/STT. Runs LLM + TTS + `/ai/play`. Appends chat history. |
+| `/ai/in/speak` | string | Say this line with TTS only. No LLM, no history. |
+| `/ai/in/reset` | int `1` | Clear chat history and empty transcript fields. |
+| `/ai/in/interrupt` | int `1` | Abort think/speak, return to `listening`. |
+| `/ai/in/listen` | int `1` or `0` | Unmute (`1`) or mute (`0`) the microphone. |
+| `/ai/in/vision` | int `1` | Grab NDI still, caption, speak a reaction. Only when `vision.enabled` and `vision.trigger=external`. TD should gate on idle + presence. |
 
 ### Example OSC Out DAT rows
 
 ```
-/luzifer/in/say	who are you
-/luzifer/in/speak	The gate is open.
-/luzifer/in/reset	1
-/luzifer/in/interrupt	1
-/luzifer/in/listen	0
-/luzifer/in/vision	1
+/ai/in/say	who are you
+/ai/in/speak	The gate is open.
+/ai/in/reset	1
+/ai/in/interrupt	1
+/ai/in/listen	0
+/ai/in/vision	1
 ```
 
 Send with a CHOP Execute / DAT Execute that calls `op('oscout1').sendOSC(address, [arg])`, or pulse the OSC Out DAT send.
 
 ## Anti-feedback
 
-While `state` is `thinking` or `speaking`, Luzifer stops the microphone stream so room speakers cannot re-trigger VAD. `/luzifer/in/listen 0` also keeps the mic closed while `state` may still be `listening`.
+While `state` is `thinking` or `speaking`, the toolkit stops the microphone stream so room speakers cannot re-trigger VAD. `/ai/in/listen 0` also keeps the mic closed while `state` may still be `listening`.
 
 ## WAV path
 
-Absolute or project-relative path configured as `tts.output_path` (default `runtime/output/speech.wav`). Point Audio File In at that file and re-read on each `/luzifer/play`. Optional dashboard **Monitor locally** plays the same file on a PC output device (off by default).
+Absolute or project-relative path configured as `tts.output_path` (default `runtime/output/speech.wav`). Point Audio File In at that file and re-read on each `/ai/play`. Optional dashboard **Monitor locally** plays the same file on a PC output device (off by default).

@@ -5,36 +5,40 @@ alwaysApply: true
 
 # TouchDesigner OSC + gating
 
-## Luzifer → TD (default `127.0.0.1:9000`)
+## Toolkit → TD (default `127.0.0.1:9000`)
 
 | Address | Type | Values |
 |---------|------|--------|
-| `/luzifer/state` | string | `listening`, `stt`, `thinking`, `synthesizing`, `speaking` (DAT only) |
-| `/luzifer/user_text` | string | visitor transcript |
-| `/luzifer/ai_text` | string | LLM reply |
-| `/luzifer/listening` | int | `1` / `0` |
-| `/luzifer/user_speaking` | int | `1` while VAD hears the visitor, else `0` |
-| `/luzifer/stt` | int | `1` while Whisper runs |
-| `/luzifer/thinking` | int | `1` while the LLM runs |
-| `/luzifer/synthesizing` | int | `1` while TTS writes the wav |
-| `/luzifer/ai_speaking` | int | `1` during playback + tail |
-| `/luzifer/play` | int | `1` after `speech.wav` is written, then `0` when speaking ends |
-| `/luzifer/in_level` | float | mic peak, 30 Hz, else `0` |
-| `/luzifer/out_level` | float | dry-wav envelope from the `play` edge, 30 Hz, else `0` |
+| `/ai/state` | string | `listening`, `stt`, `thinking`, `synthesizing`, `speaking` (DAT only) |
+| `/ai/user_text` | string | visitor transcript |
+| `/ai/ai_text` | string | LLM reply |
+| `/ai/listening` | int | `1` / `0` |
+| `/ai/user_speaking` | int | `1` while VAD hears the visitor, else `0` |
+| `/ai/stt` | int | `1` while Whisper runs |
+| `/ai/thinking` | int | `1` while the LLM runs |
+| `/ai/synthesizing` | int | `1` while TTS writes the wav |
+| `/ai/ai_speaking` | int | `1` during playback + tail |
+| `/ai/play` | int | `1` after `speech.wav` is written, then `0` when speaking ends |
+| `/ai/in_level` | float | mic peak, 30 Hz, else `0` |
+| `/ai/out_level` | float | dry-wav envelope from the `play` edge, 30 Hz, else `0` |
+| `/ai/vision_text` | string | latest NDI caption (DAT) |
+| `/ai/vision` | int | `1` then `0` on each new caption |
+| `/ai/vision_active` | int | `1` while the vision model call is in flight |
 
 Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inactive channels are explicitly `0` — OSC In CHOP holds the last value.
 
-## TD → Luzifer (default `127.0.0.1:9001`)
+## TD → toolkit (default `127.0.0.1:9001`)
 
 | Address | Type | Values |
 |---------|------|--------|
-| `/luzifer/in/say` | string | inject visitor text (LLM+TTS) |
-| `/luzifer/in/speak` | string | TTS-only line |
-| `/luzifer/in/reset` | int | `1` clear history |
-| `/luzifer/in/interrupt` | int | `1` abort turn |
-| `/luzifer/in/listen` | int | `1` unmute / `0` mute mic |
+| `/ai/in/say` | string | inject visitor text (LLM+TTS) |
+| `/ai/in/speak` | string | TTS-only line |
+| `/ai/in/reset` | int | `1` clear history |
+| `/ai/in/interrupt` | int | `1` abort turn |
+| `/ai/in/listen` | int | `1` unmute / `0` mute mic |
+| `/ai/in/vision` | int | `1` grab NDI still, caption, speak (external trigger only) |
 
-- WAV path: `runtime/output/speech.wav` (reload on `/luzifer/play`).
+- WAV path: `runtime/output/speech.wav` (reload on `/ai/play`).
 - Mic / VAD stream MUST stop whenever `state != "listening"` (covers `stt`, `thinking`, `synthesizing`, `speaking` anti-feedback).
-- Do not invent new `/luzifer/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
+- Do not invent new `/ai/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
 - Send OSC via `TouchDesignerOscClient`; receive via `TouchDesignerOscServer`. No raw socket one-offs in the pipeline.

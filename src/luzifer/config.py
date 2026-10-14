@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -126,10 +126,12 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
+    name: str = "Luzifer"
     system_prompt: str = (
         "You are Luzifer, an interactive installation character. "
         "Keep answers short, vivid, and suitable for spoken TTS."
     )
+
     audio: AudioSettings = Field(default_factory=AudioSettings)
     stt: SttSettings = Field(default_factory=SttSettings)
     llm: LlmSettings = Field(default_factory=LlmSettings)
@@ -137,6 +139,12 @@ class AppSettings(BaseSettings):
     osc: OscSettings = Field(default_factory=OscSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
     vision: VisionSettings = Field(default_factory=VisionSettings)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        text = str(value or "").strip()
+        return text or "Luzifer"
 
     def resolve_output_path(self) -> Path:
         path = Path(self.tts.output_path)

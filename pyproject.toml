@@ -1,7 +1,7 @@
 [project]
 name = "luzifer"
 version = "0.1.0"
-description = "Local AI speech microservice for the Luzifer TouchDesigner installation"
+description = "Local AI interaction toolkit: speech, vision, and OSC for TouchDesigner"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

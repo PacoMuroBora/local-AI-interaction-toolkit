@@ -1,4 +1,4 @@
-"""Inbound OSC server for TouchDesigner → Luzifer commands."""
+"""Inbound OSC server for TouchDesigner → toolkit commands."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ from loguru import logger
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import AsyncIOOSCUDPServer
 
-ADDR_SAY = "/luzifer/in/say"
-ADDR_SPEAK = "/luzifer/in/speak"
-ADDR_RESET = "/luzifer/in/reset"
-ADDR_INTERRUPT = "/luzifer/in/interrupt"
-ADDR_LISTEN = "/luzifer/in/listen"
-ADDR_VISION = "/luzifer/in/vision"
+ADDR_SAY = "/ai/in/say"
+ADDR_SPEAK = "/ai/in/speak"
+ADDR_RESET = "/ai/in/reset"
+ADDR_INTERRUPT = "/ai/in/interrupt"
+ADDR_LISTEN = "/ai/in/listen"
+ADDR_VISION = "/ai/in/vision"
 
 CommandHandler = Callable[[str, Any], Awaitable[None] | None]
 
@@ -33,7 +33,7 @@ class TouchDesignerOscServer:
 
     def _dispatch(self, address: str, *args: Any) -> None:
         value: Any = args[0] if args else None
-        # TD often streams /luzifer/in/vision 0 every frame — drop before scheduling.
+        # TD often streams /ai/in/vision 0 every frame — drop before scheduling.
         if address == ADDR_VISION:
             fire = True
             if isinstance(value, (int, float)):

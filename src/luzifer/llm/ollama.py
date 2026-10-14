@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -11,19 +13,46 @@ from luzifer.config import LlmSettings
 
 ChatMessage = dict[str, str]
 
+# Cold-load of a 14B can sit well past a normal generation. The request blocks
+# inside Ollama until weights are resident, so this is a load budget, not a token budget.
+_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
+# -1 pins the model until the server restarts. Omitting it resets Ollama's 5 min default
+# and the next call evicts whatever we just warmed.
+_KEEP_ALIVE = -1
+
+
+def models_match(requested: str, loaded: str) -> bool:
+    """True when an /api/ps name is the tag we asked Ollama to load."""
+
+    def norm(name: str) -> str:
+        name = name.strip()
+        if name.endswith(":latest"):
+            name = name[: -len(":latest")]
+        return name
+
+    a, b = norm(requested), norm(loaded)
+    if not a or not b:
+        return False
+    return a == b or b.endswith("/" + a) or a.endswith("/" + b)
+
 
 class OllamaEngine:
-    """Talk to a local Ollama server over HTTP."""
+    """Talk to a local Ollama server over HTTP.
 
-    def __init__(self) -> None:
+    `lock` is shared with the vision client. Ollama loads one runner at a time on
+    a single GPU; overlapping /api/chat calls (14B talker + VLM) wedge that runner.
+    """
+
+    def __init__(self, lock: asyncio.Lock | None = None) -> None:
         self._client: httpx.AsyncClient | None = None
         self._base_url: str | None = None
+        self._lock = lock if lock is not None else asyncio.Lock()
 
     async def _get_client(self, base_url: str) -> httpx.AsyncClient:
         if self._client is None or self._base_url != base_url:
             if self._client is not None:
                 await self._client.aclose()
-            self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=120.0)
+            self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=_TIMEOUT)
             self._base_url = base_url
         return self._client
 
@@ -32,12 +61,67 @@ class OllamaEngine:
             await self._client.aclose()
             self._client = None
 
+    async def loaded_models(self, base_url: str) -> list[str]:
+        """Names currently resident in the Ollama runner. Raises on HTTP failure."""
+        client = await self._get_client(base_url)
+        response = await client.get("/api/ps")
+        response.raise_for_status()
+        names: list[str] = []
+        for item in response.json().get("models", []):
+            for key in ("name", "model"):
+                name = str(item.get(key) or "").strip()
+                if name and name not in names:
+                    names.append(name)
+        return names
+
+    async def warmup(self, settings: LlmSettings) -> bool:
+        """Load the chat model and pin it. One token, no history. Serialized on `lock`."""
+        model = (settings.model or "").strip()
+        if not model:
+            logger.warning("Chat warmup skipped (llm.model empty)")
+            return False
+        async with self._lock:
+            t0 = time.perf_counter()
+            try:
+                client = await self._get_client(settings.base_url)
+                response = await client.post(
+                    "/api/chat",
+                    json={
+                        "model": model,
+                        "stream": False,
+                        "keep_alive": _KEEP_ALIVE,
+                        "messages": [{"role": "user", "content": "Reply with ok."}],
+                        "options": {"temperature": 0, "num_predict": 1},
+                    },
+                )
+                response.raise_for_status()
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Chat warmup failed for {} ({:.1f}s): {}",
+                    model,
+                    time.perf_counter() - t0,
+                    exc,
+                )
+                return False
+        logger.info("Chat model ready in {:.1f}s ({})", time.perf_counter() - t0, model)
+        return True
+
     async def chat(
         self,
         user_text: str,
         system_prompt: str,
         settings: LlmSettings,
         history: list[ChatMessage] | None = None,
+    ) -> str:
+        async with self._lock:
+            return await self._chat(user_text, system_prompt, settings, history)
+
+    async def _chat(
+        self,
+        user_text: str,
+        system_prompt: str,
+        settings: LlmSettings,
+        history: list[ChatMessage] | None,
     ) -> str:
         client = await self._get_client(settings.base_url)
         messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
@@ -47,6 +131,7 @@ class OllamaEngine:
         payload = {
             "model": settings.model,
             "stream": False,
+            "keep_alive": _KEEP_ALIVE,
             "messages": messages,
             "options": {
                 "temperature": settings.temperature,

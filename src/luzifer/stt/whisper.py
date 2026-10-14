@@ -90,5 +90,9 @@ class WhisperEngine:
         )
         return Transcript(text=text, language=detected, language_probability=prob_f)
 
+    async def preload(self, settings: SttSettings) -> None:
+        """Load Whisper before the first utterance so CUDA init doesn't overlap an Ollama load."""
+        await asyncio.to_thread(self._ensure_model, settings)
+
     async def transcribe(self, audio: np.ndarray, settings: SttSettings) -> Transcript:
         return await asyncio.to_thread(self._transcribe_sync, audio, settings)

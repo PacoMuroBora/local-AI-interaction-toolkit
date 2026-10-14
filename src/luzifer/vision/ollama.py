@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import io
 import re
+import time
 
 import httpx
 from loguru import logger
@@ -26,18 +29,34 @@ def is_usable_caption(text: str) -> bool:
     return True
 
 
+# Same budget and pin as the chat client. A later request that omits keep_alive
+# resets Ollama's 5 minute default and drops the other model.
+_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
+_KEEP_ALIVE = -1
+
+
+def _tiny_jpeg() -> bytes:
+    """Small valid JPEG so a VLM warmup exercises the image path, not a text-only load."""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (32, 32), (24, 24, 24)).save(buf, format="JPEG", quality=40)
+    return buf.getvalue()
+
+
 class VisionOllama:
     """POST /api/chat (fallback /api/generate) with images for a small local VLM."""
 
-    def __init__(self) -> None:
+    def __init__(self, lock: asyncio.Lock | None = None) -> None:
         self._client: httpx.AsyncClient | None = None
         self._base_url: str | None = None
+        self._lock = lock if lock is not None else asyncio.Lock()
 
     async def _get_client(self, base_url: str) -> httpx.AsyncClient:
         if self._client is None or self._base_url != base_url:
             if self._client is not None:
                 await self._client.aclose()
-            self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=90.0)
+            self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=_TIMEOUT)
             self._base_url = base_url
         return self._client
 
@@ -46,7 +65,61 @@ class VisionOllama:
             await self._client.aclose()
             self._client = None
 
+    async def warmup(self, settings: VisionSettings, *, base_url: str) -> bool:
+        """Load the VLM and pin it. Junk captions still count — we only need the weights resident."""
+        model = (settings.model or "").strip()
+        if not model:
+            logger.warning("Vision warmup skipped (vision.model empty)")
+            return False
+        async with self._lock:
+            t0 = time.perf_counter()
+            try:
+                jpeg = _tiny_jpeg()
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Vision warmup jpeg failed: {}", exc)
+                return False
+            client = await self._get_client(base_url)
+            b64 = base64.b64encode(jpeg).decode("ascii")
+            try:
+                response = await client.post(
+                    "/api/chat",
+                    json={
+                        "model": model,
+                        "stream": False,
+                        "keep_alive": _KEEP_ALIVE,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": "Reply with ok.",
+                                "images": [b64],
+                            }
+                        ],
+                        "options": {"temperature": 0, "num_predict": 1},
+                    },
+                )
+                response.raise_for_status()
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Vision warmup failed for {} ({:.1f}s): {}",
+                    model,
+                    time.perf_counter() - t0,
+                    exc,
+                )
+                return False
+        logger.info("Vision model ready in {:.1f}s ({})", time.perf_counter() - t0, model)
+        return True
+
     async def describe(
+        self,
+        jpeg: bytes,
+        settings: VisionSettings,
+        *,
+        base_url: str,
+    ) -> str:
+        async with self._lock:
+            return await self._describe(jpeg, settings, base_url=base_url)
+
+    async def _describe(
         self,
         jpeg: bytes,
         settings: VisionSettings,
@@ -71,7 +144,7 @@ class VisionOllama:
                 json={
                     "model": settings.model,
                     "stream": False,
-                    "keep_alive": "30m",
+                    "keep_alive": _KEEP_ALIVE,
                     "messages": [
                         {"role": "user", "content": prompt, "images": [b64]},
                     ],
@@ -94,7 +167,7 @@ class VisionOllama:
                 json={
                     "model": settings.model,
                     "stream": False,
-                    "keep_alive": "30m",
+                    "keep_alive": _KEEP_ALIVE,
                     "prompt": prompt,
                     "images": [b64],
                     "options": options,

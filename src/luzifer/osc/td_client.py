@@ -1,4 +1,7 @@
-"""Thread-safe OSC client for TouchDesigner."""
+"""Thread-safe OSC client for TouchDesigner.
+
+Address root is `/ai`, not the installation name.
+"""
 
 from __future__ import annotations
 
@@ -8,24 +11,24 @@ from typing import Literal
 from loguru import logger
 from pythonosc.udp_client import SimpleUDPClient
 
-StateName = Literal["listening", "stt", "thinking", "synthesizing", "speaking"]
+StateName = Literal["loading", "listening", "stt", "thinking", "synthesizing", "speaking"]
 
-ADDR_STATE = "/luzifer/state"
-ADDR_USER_TEXT = "/luzifer/user_text"
-ADDR_AI_TEXT = "/luzifer/ai_text"
-ADDR_PLAY = "/luzifer/play"
+ADDR_STATE = "/ai/state"
+ADDR_USER_TEXT = "/ai/user_text"
+ADDR_AI_TEXT = "/ai/ai_text"
+ADDR_PLAY = "/ai/play"
 # Int channels for OSC In CHOP. OSC bool (T/F) has no payload and TD often drops it.
-ADDR_LISTENING = "/luzifer/listening"
-ADDR_USER_SPEAKING = "/luzifer/user_speaking"
-ADDR_STT = "/luzifer/stt"
-ADDR_THINKING = "/luzifer/thinking"
-ADDR_SYNTHESIZING = "/luzifer/synthesizing"
-ADDR_AI_SPEAKING = "/luzifer/ai_speaking"
-ADDR_IN_LEVEL = "/luzifer/in_level"
-ADDR_OUT_LEVEL = "/luzifer/out_level"
-ADDR_VISION_TEXT = "/luzifer/vision_text"
-ADDR_VISION = "/luzifer/vision"
-ADDR_VISION_ACTIVE = "/luzifer/vision_active"
+ADDR_LISTENING = "/ai/listening"
+ADDR_USER_SPEAKING = "/ai/user_speaking"
+ADDR_STT = "/ai/stt"
+ADDR_THINKING = "/ai/thinking"
+ADDR_SYNTHESIZING = "/ai/synthesizing"
+ADDR_AI_SPEAKING = "/ai/ai_speaking"
+ADDR_IN_LEVEL = "/ai/in_level"
+ADDR_OUT_LEVEL = "/ai/out_level"
+ADDR_VISION_TEXT = "/ai/vision_text"
+ADDR_VISION = "/ai/vision"
+ADDR_VISION_ACTIVE = "/ai/vision_active"
 
 OscArg = str | int | float
 

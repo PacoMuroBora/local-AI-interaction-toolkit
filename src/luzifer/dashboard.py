@@ -32,7 +32,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Luzifer Dashboard</title>
+  <title>Local AI Interaction Toolkit</title>
   <style>
     :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; }
     body { margin: 0; background: #0f1115; color: #e8eaed; min-height: 100vh; display:flex; flex-direction:column; }
@@ -41,9 +41,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .tab { background:#161a22; color:#9aa0a6; border:1px solid #2a2f3a; border-radius:8px; padding:.45rem .85rem; cursor:pointer; font-weight:600; }
     .tab.active { background:#1f6feb; color:white; border-color:#1f6feb; }
     .badge { padding: .25rem .6rem; border-radius: 999px; background:#1f6feb33; color:#79b8ff; font-size:.85rem; }
-    .osc-strip { display:flex; gap:.5rem; align-items:center; margin-left:auto; font-size:.8rem; color:#9aa0a6; flex-wrap:wrap; }
-    .osc-strip input { width:7.5rem; background:#0f1115; color:#e8eaed; border:1px solid #2a2f3a; border-radius:6px; padding:.3rem .45rem; }
-    .osc-strip input.wide { width:9rem; }
+    #save { margin-left:auto; }
+    header .brand { width:9.5rem; flex:0 0 auto; font-weight:700; font-size:1rem;
+      background:transparent; border-color:transparent; padding:.3rem .45rem; }
+    header .brand:hover, header .brand:focus { background:#0f1115; border-color:#2a2f3a; }
+    .io-table { width:100%; border-collapse:collapse; margin-top:.65rem; font-size:.8rem; }
+    .io-table th, .io-table td { text-align:left; padding:.4rem .45rem; border-bottom:1px solid #2a2f3a; vertical-align:top; }
+    .io-table th { color:#9aa0a6; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+    .io-table code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.75rem; color:#79b8ff; white-space:nowrap; }
+    .io-table .typ { color:#d29922; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.72rem; white-space:nowrap; }
     main { flex:1; padding:1rem 1.25rem; }
     .panel { display:none; background:#161a22; border:1px solid #2a2f3a; border-radius:12px; padding:1rem; }
     .panel.active { display:block; }
@@ -127,24 +133,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 <body>
   <header>
-    <strong>Luzifer</strong>
+    <input id="name" class="brand" value="Luzifer" spellcheck="false" title="Installation name" />
     <nav class="tabs">
       <button class="tab active" data-tab="audio-in">Audio In</button>
       <button class="tab" data-tab="audio-out">Audio Out</button>
       <button class="tab" data-tab="prompt-llm">Prompt / LLM</button>
       <button class="tab" data-tab="vision">Vision</button>
+      <button class="tab" data-tab="osc">OSC</button>
     </nav>
     <span id="state" class="badge">connecting…</span>
     <span id="status"></span>
-    <div class="osc-strip">
-      <span>OSC → TD</span>
-      <input id="osc.host" class="wide" placeholder="host" />
-      <input id="osc.port" type="number" placeholder="9000" />
-      <span>TD → OSC</span>
-      <input id="osc.listen_host" class="wide" placeholder="listen host" />
-      <input id="osc.listen_port" type="number" placeholder="9001" />
-      <button id="save" class="secondary">Save</button>
-    </div>
+    <button id="save" class="secondary">Save</button>
   </header>
 
   <div class="metrics">
@@ -298,7 +297,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <option value="external">external (OSC from TD)</option>
             <option value="local_idle">local_idle (backend silence timer)</option>
           </select>
-          <p class="hint">External: TD decides idle + presence, then pulses <code>/luzifer/in/vision</code>. Local idle: backend captions when quiet.</p>
+          <p class="hint">External: TD decides idle + presence, then pulses <code>/ai/in/vision</code>. Local idle: backend captions when quiet.</p>
           <label>Idle After (s)</label><input id="vision.idle_after_s" type="number" step="0.5" />
           <label>Speak Cooldown (s)</label><input id="vision.speak_cooldown_s" type="number" step="0.5" />
           <label>Sample Interval (s)</label><input id="vision.interval_s" type="number" step="0.5" />
@@ -339,6 +338,54 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
     </section>
+
+    <section id="panel-osc" class="panel">
+      <div class="grid">
+        <div>
+          <h2>Toolkit → TD</h2>
+          <p class="hint">UDP out. Point a TD <strong>OSC In</strong> CHOP (ints/floats) and DAT (strings) at this host and port. Ints are <code>0</code>/<code>1</code>, not OSC bool — a bool has no payload and the CHOP often never makes a channel. Flag snapshots send every flag, so an inactive one is explicit <code>0</code>.</p>
+          <label>Host</label><input id="osc.host" placeholder="127.0.0.1" />
+          <label>Port</label><input id="osc.port" type="number" placeholder="9000" />
+          <table class="io-table">
+            <thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>/ai/state</code></td><td class="typ">string</td><td>DAT. <code>loading</code>, <code>listening</code>, <code>stt</code>, <code>thinking</code>, <code>synthesizing</code>, <code>speaking</code>.</td></tr>
+              <tr><td><code>/ai/user_text</code></td><td class="typ">string</td><td>DAT. Visitor transcript.</td></tr>
+              <tr><td><code>/ai/ai_text</code></td><td class="typ">string</td><td>DAT. AI reply.</td></tr>
+              <tr><td><code>/ai/vision_text</code></td><td class="typ">string</td><td>DAT. Latest NDI caption.</td></tr>
+              <tr><td><code>/ai/listening</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while the pipeline is listening.</td></tr>
+              <tr><td><code>/ai/user_speaking</code></td><td class="typ">int</td><td>CHOP. <code>1</code> only while VAD hears the visitor.</td></tr>
+              <tr><td><code>/ai/stt</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while Whisper is transcribing.</td></tr>
+              <tr><td><code>/ai/thinking</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while the LLM is generating.</td></tr>
+              <tr><td><code>/ai/synthesizing</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while TTS is writing <code>speech.wav</code>.</td></tr>
+              <tr><td><code>/ai/ai_speaking</code></td><td class="typ">int</td><td>CHOP. <code>1</code> during playback plus tail.</td></tr>
+              <tr><td><code>/ai/play</code></td><td class="typ">int</td><td>CHOP. <code>1</code> once the wav exists, back to <code>0</code> when speaking ends. Trigger playback on the rising edge.</td></tr>
+              <tr><td><code>/ai/vision</code></td><td class="typ">int</td><td>CHOP. Pulse <code>1</code> then <code>0</code> on each new caption.</td></tr>
+              <tr><td><code>/ai/vision_active</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while the vision model call is in flight.</td></tr>
+              <tr><td><code>/ai/in_level</code></td><td class="typ">float</td><td>CHOP. Mic peak, 0–1, 30 Hz. Drops to <code>0</code> shortly after the mic closes.</td></tr>
+              <tr><td><code>/ai/out_level</code></td><td class="typ">float</td><td>CHOP. Dry-wav peak, 0–1, 30 Hz, clocked from the <code>play</code> edge. Not the post-VST level.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h2>TD → Toolkit</h2>
+          <p class="hint">UDP in. TD <strong>OSC Out</strong> DAT, network address and port below. One message per send: address plus one argument. <code>/ai/in/vision 0</code> is ignored (TD often streams it every frame).</p>
+          <label>Listen host</label><input id="osc.listen_host" placeholder="127.0.0.1" />
+          <label>Listen port</label><input id="osc.listen_port" type="number" placeholder="9001" />
+          <table class="io-table">
+            <thead><tr><th>Address</th><th>Arg</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>/ai/in/say</code></td><td class="typ">string</td><td>Visitor line. Skips mic and STT. Runs LLM, TTS, then <code>/ai/play</code>. Appends chat history.</td></tr>
+              <tr><td><code>/ai/in/speak</code></td><td class="typ">string</td><td>TTS only. No LLM, no history.</td></tr>
+              <tr><td><code>/ai/in/reset</code></td><td class="typ">int 1</td><td>Clear chat history and empty the transcript fields.</td></tr>
+              <tr><td><code>/ai/in/interrupt</code></td><td class="typ">int 1</td><td>Abort think or speak and return to listening.</td></tr>
+              <tr><td><code>/ai/in/listen</code></td><td class="typ">int</td><td><code>1</code> unmutes the mic, <code>0</code> mutes it.</td></tr>
+              <tr><td><code>/ai/in/vision</code></td><td class="typ">int 1</td><td>Grab an NDI still, caption it, speak a reaction. Only when vision is enabled and trigger is <code>external</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
@@ -376,6 +423,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 <script>
 const PATHS = [
+  "name",
   "system_prompt",
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
   "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.speaking_tail_pad_ms",
@@ -404,7 +452,12 @@ function set(obj, path, value){
     value = value === "" || value === "null" ? null : Number(value);
   }
   if (path === "stt.language") value = value === "" ? null : value;
+  if (path === "name") value = String(value || "").trim() || "Luzifer";
   cur[key] = value;
+}
+function applyBrand(value){
+  const name = String(value || "").trim() || "Luzifer";
+  document.title = name + " Dashboard";
 }
 function setStatus(msg){ document.getElementById("status").textContent = msg || ""; }
 
@@ -633,9 +686,11 @@ async function loadConfig(){
   await refreshLlmModels();
   await refreshWhisperModels();
   await refreshTtsModels(cfg);
+  applyBrand(document.getElementById("name").value);
   setStatus("config loaded");
   return cfg;
 }
+document.getElementById("name").addEventListener("input", (ev) => applyBrand(ev.target.value));
 
 async function collectConfig(){
   const cfg = await (await fetch("/api/config")).json();
@@ -908,7 +963,7 @@ class TtsDownloadBody(BaseModel):
 
 
 def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
-    app = FastAPI(title="Luzifer Dashboard", version="0.1.0")
+    app = FastAPI(title="Local AI Interaction Toolkit", version="0.1.0")
     hub = DashboardHub()
     osc_server = TouchDesignerOscServer(on_command=_make_osc_handler(pipeline))
     app.state.osc_server = osc_server
