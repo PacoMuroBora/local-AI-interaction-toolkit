@@ -60,20 +60,24 @@ def normalize_lang(code: str | None) -> str | None:
 
 
 def resolve_tts_for_lang(tts: TtsSettings, lang: str | None) -> TtsSettings:
-    """Copy TTS settings with engine/voice/lang overridden for this turn's language."""
+    """Copy TTS settings with engine/voice/lang/style overridden for this turn's language."""
     out = tts.model_copy(deep=True)
     code = normalize_lang(lang)
-    if not out.match_input_language or not code:
-        return out
-    engine = out.engine_by_lang.get(code)
-    if engine:
-        out.engine = engine
-    voice = out.voice_by_lang.get(code)
-    if voice:
-        out.voice = voice
-    kokoro_lang = out.lang_by_lang.get(code)
-    if kokoro_lang:
-        out.lang = kokoro_lang
+    # Legacy engine/voice fields track the English column when matching is off.
+    style_code = code if (out.match_input_language and code) else "en"
+    if out.match_input_language and code:
+        engine = out.engine_by_lang.get(code)
+        if engine:
+            out.engine = engine
+        voice = out.voice_by_lang.get(code)
+        if voice:
+            out.voice = voice
+        kokoro_lang = out.lang_by_lang.get(code)
+        if kokoro_lang:
+            out.lang = kokoro_lang
+    speaker = (out.speaker_by_lang.get(style_code) or "").strip()
+    if speaker:
+        out.speaker = speaker
     return out
 
 

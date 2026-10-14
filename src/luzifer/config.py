@@ -76,6 +76,16 @@ class TtsSettings(BaseModel):
             "de": "de",
         }
     )
+    # Active Piper style name for this synth call (set per turn from speaker_by_lang).
+    speaker: str = "neutral"
+    # ISO 639-1 → Piper speaker style. Ignored unless the voice is multi-speaker.
+    # neutral is the straight Thorsten read; id 0 on the emotional model is amused.
+    speaker_by_lang: dict[str, str] = Field(
+        default_factory=lambda: {
+            "en": "neutral",
+            "de": "neutral",
+        }
+    )
 
 
 class OscSettings(BaseModel):

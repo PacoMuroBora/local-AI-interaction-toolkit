@@ -63,7 +63,10 @@ tts:
     de: piper
   voice_by_lang:
     en: am_onyx
-    de: de_DE-thorsten-medium
+    de: de_DE-thorsten_emotional-medium
+  speaker_by_lang:
+    en: neutral
+    de: neutral
   lang_by_lang:
     en: en-us
     de: de

@@ -109,7 +109,7 @@ With `tts.match_input_language: true` (default), each turn uses Whisper’s lang
 - Mixed (Kokoro EN + Piper DE): best DE quality. Both stay preloaded; RAM cost is ~one Kokoro session + one Piper model. Fine on a 4080-class box.
 - Two Piper voices: two ONNX models cached; still cheap vs LLM/Whisper.
 
-Recommended install: EN `kokoro`/`am_onyx`, DE `piper`/`de_DE-thorsten-high` (or `pavoque` for a darker tone). Download from Audio Out → TTS Assets.
+Recommended install: EN `kokoro`/`am_onyx`. For German, `de_DE-thorsten-high` is the cleanest waveform; `de_DE-thorsten_emotional-medium` is the more natural character voice (medium tier, eight acted styles). Selecting that voice shows a Style dropdown — **neutral** is the straight read. Download from Audio Out → TTS Assets.
 
 The LLM also gets a one-shot “reply in German/English this turn” suffix that is **not** written into history.
 

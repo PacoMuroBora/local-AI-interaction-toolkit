@@ -214,6 +214,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               </select>
               <label>Voice</label>
               <select id="tts.voice_by_lang.en"></select>
+              <div id="tts.speaker_wrap.en" hidden>
+                <label>Style</label>
+                <select id="tts.speaker_by_lang.en"></select>
+                <p class="hint">Neutral is the straight read. The others are acted.</p>
+              </div>
             </div>
             <div class="lang-card">
               <h3>German</h3>
@@ -225,6 +230,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               </select>
               <label>Voice</label>
               <select id="tts.voice_by_lang.de"></select>
+              <div id="tts.speaker_wrap.de" hidden>
+                <label>Style</label>
+                <select id="tts.speaker_by_lang.de"></select>
+                <p class="hint">Neutral is the straight read. The others are acted.</p>
+              </div>
             </div>
           </div>
           <label>Speed</label><input id="tts.speed" type="number" step="0.05" />
@@ -437,6 +447,7 @@ const PATHS = [
 ];
 let KOKORO_VOICES = [];
 let PIPER_VOICES = [];
+let PIPER_SPEAKERS = {};
 
 function get(obj, path){ return path.split(".").reduce((o,k)=>o?.[k], obj); }
 function set(obj, path, value){
@@ -565,6 +576,28 @@ function fillVoiceSelect(selectId, engine, current){
   }
 }
 
+function syncSpeakerRow(lang, preferred){
+  const wrap = document.getElementById("tts.speaker_wrap." + lang);
+  const sel = document.getElementById("tts.speaker_by_lang." + lang);
+  const voiceEl = document.getElementById("tts.voice_by_lang." + lang);
+  if (!wrap || !sel || !voiceEl) return;
+  const names = PIPER_SPEAKERS[voiceEl.value] || [];
+  if (!names.length){
+    wrap.hidden = true;
+    return;
+  }
+  const keep = preferred || sel.value || "neutral";
+  sel.innerHTML = "";
+  for (const name of names){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  }
+  sel.value = names.includes(keep) ? keep : (names.includes("neutral") ? "neutral" : names[0]);
+  wrap.hidden = false;
+}
+
 function fillLangVoiceSelects(cfg){
   const enEngine = get(cfg, "tts.engine_by_lang.en")
     || document.getElementById("tts.engine_by_lang.en").value
@@ -592,12 +625,18 @@ function fillLangVoiceSelects(cfg){
       || get(cfg, "tts.voice")
       || ""
   );
+  syncSpeakerRow("en", get(cfg, "tts.speaker_by_lang.en"));
+  syncSpeakerRow("de", get(cfg, "tts.speaker_by_lang.de"));
 }
 
 async function refreshTtsModels(cfg){
   const data = await (await fetch("/api/models/tts")).json();
   KOKORO_VOICES = data.kokoro.voices || [];
   PIPER_VOICES = (data.piper || []).map(p => p.voice);
+  PIPER_SPEAKERS = {};
+  for (const p of (data.piper || [])){
+    if (p.speakers && p.speakers.length) PIPER_SPEAKERS[p.voice] = p.speakers;
+  }
   fillLangVoiceSelects(cfg || {});
   const rows = [
     { id: "kokoro", label: "kokoro (onnx + voices)", downloaded: data.kokoro.downloaded },
@@ -617,6 +656,7 @@ async function refreshTtsModels(cfg){
         deEngine.value = "piper";
         fillVoiceSelect("tts.voice_by_lang.de", "piper", voice);
       }
+      syncSpeakerRow("de");
       setStatus("assigned to German column");
     },
     async (row) => {
@@ -705,6 +745,11 @@ async function collectConfig(){
   cfg.tts.engine_by_lang.de = document.getElementById("tts.engine_by_lang.de").value || "kokoro";
   cfg.tts.voice_by_lang.en = document.getElementById("tts.voice_by_lang.en").value || cfg.tts.voice;
   cfg.tts.voice_by_lang.de = document.getElementById("tts.voice_by_lang.de").value || cfg.tts.voice;
+  cfg.tts.speaker_by_lang = cfg.tts.speaker_by_lang || {};
+  for (const lang of ["en", "de"]){
+    const style = document.getElementById("tts.speaker_by_lang." + lang).value;
+    if (style) cfg.tts.speaker_by_lang[lang] = style;
+  }
   // Legacy single fields track English (fallback when match is off).
   cfg.tts.engine = cfg.tts.engine_by_lang.en;
   cfg.tts.voice = cfg.tts.voice_by_lang.en;
@@ -740,10 +785,14 @@ document.getElementById("save").onclick = async () => {
 };
 document.getElementById("tts.engine_by_lang.en").onchange = () => {
   fillVoiceSelect("tts.voice_by_lang.en", document.getElementById("tts.engine_by_lang.en").value, document.getElementById("tts.voice_by_lang.en").value);
+  syncSpeakerRow("en");
 };
 document.getElementById("tts.engine_by_lang.de").onchange = () => {
   fillVoiceSelect("tts.voice_by_lang.de", document.getElementById("tts.engine_by_lang.de").value, document.getElementById("tts.voice_by_lang.de").value);
+  syncSpeakerRow("de");
 };
+document.getElementById("tts.voice_by_lang.en").onchange = () => syncSpeakerRow("en");
+document.getElementById("tts.voice_by_lang.de").onchange = () => syncSpeakerRow("de");
 document.getElementById("refresh_llm").onclick = () => refreshLlmModels();
 document.getElementById("pull_btn").onclick = async () => {
   const name = document.getElementById("pull_name").value.trim() || document.getElementById("llm.model").value.trim();

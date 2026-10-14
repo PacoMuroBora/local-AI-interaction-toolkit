@@ -129,6 +129,39 @@ PIPER_VOICES = {
     },
 }
 
+# Multi-speaker Piper voices. Ids match the .onnx.json speaker_id_map.
+# thorsten_emotional has no default_speaker_id, so Piper falls back to 0 (amused).
+PIPER_SPEAKERS: dict[str, dict[str, int]] = {
+    "de_DE-thorsten_emotional-medium": {
+        "neutral": 4,
+        "amused": 0,
+        "angry": 1,
+        "disgusted": 2,
+        "drunk": 3,
+        "sleepy": 5,
+        "surprised": 6,
+        "whisper": 7,
+    },
+}
+
+
+def piper_speaker_names(voice: str) -> list[str]:
+    """Style names for a Piper voice, neutral first when present."""
+    return list(PIPER_SPEAKERS.get(voice, {}))
+
+
+def piper_speaker_id(voice: str, name: str | None) -> int | None:
+    """Speaker id for a multi-speaker voice. Unknown styles fall back to neutral."""
+    speakers = PIPER_SPEAKERS.get(voice)
+    if not speakers:
+        return None
+    key = (name or "").strip().lower()
+    if key in speakers:
+        return speakers[key]
+    if "neutral" in speakers:
+        return speakers["neutral"]
+    return next(iter(speakers.values()))
+
 
 def models_dir() -> Path:
     path = ROOT_DIR / "models"
@@ -271,6 +304,7 @@ def list_tts_models() -> dict[str, Any]:
                 "downloaded": onnx.exists() and meta.exists(),
                 "onnx": str(onnx),
                 "json": str(meta),
+                "speakers": piper_speaker_names(voice),
             }
         )
     return {

@@ -15,6 +15,7 @@ from loguru import logger
 from luzifer.audio.envelope import peak_envelope_samples
 from luzifer.config import TtsSettings
 from luzifer.metrics import LEVEL_HZ
+from luzifer.models import piper_speaker_id
 
 SynthResult = tuple[float, float, np.ndarray]
 
@@ -172,12 +173,16 @@ class TtsEngine:
 
     def _synthesize_piper(self, text: str, path: Path, settings: TtsSettings) -> SynthResult:
         try:
+            from piper import SynthesisConfig
+
             piper = self._ensure_piper(settings.voice)
+            speaker_id = piper_speaker_id(settings.voice, settings.speaker)
+            syn_config = SynthesisConfig(speaker_id=speaker_id) if speaker_id is not None else None
 
             path.parent.mkdir(parents=True, exist_ok=True)
             t0 = time.perf_counter()
             with wave.open(str(path), "wb") as wf:
-                piper.synthesize_wav(text, wf)  # type: ignore[attr-defined]
+                piper.synthesize_wav(text, wf, syn_config=syn_config)  # type: ignore[attr-defined]
                 frames = wf.getnframes()
                 rate = wf.getframerate()
             duration = float(frames / rate) if rate else 0.5
@@ -194,10 +199,12 @@ class TtsEngine:
             except Exception:  # noqa: BLE001
                 pass
             logger.info(
-                "Piper synth {:.2f}s → {:.2f}s audio (voice={})",
+                "Piper synth {:.2f}s → {:.2f}s audio (voice={} speaker={} id={})",
                 time.perf_counter() - t0,
                 duration,
                 settings.voice,
+                settings.speaker if speaker_id is not None else "-",
+                speaker_id if speaker_id is not None else "-",
             )
             return duration, peak, envelope
         except Exception as exc:  # noqa: BLE001
