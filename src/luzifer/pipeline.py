@@ -973,13 +973,13 @@ class Pipeline:
         # Idle may decline an empty room. A manual / OSC comment was asked to speak.
         if force:
             user = (
-                "[camera]\n"
+                "[what you see from where you stand — not a visitor]\n"
                 f"{observation.strip()}\n\n"
                 "Pick one element. Mock it. Do not describe the rest."
             )
         else:
             user = (
-                "[camera — not a visitor]\n"
+                "[what you see from where you stand — not a visitor]\n"
                 f"{observation.strip()}\n\n"
                 "Pick one element. Mock it. If no person is visible, reply with exactly SILENT."
             )
@@ -988,7 +988,7 @@ class Pipeline:
         system = idle_system_prompt(vision, self.last_language)
         if force:
             system += (
-                "\n\nThis comment was requested. Pick one element and mock it. "
+                "\n\nThis comment was requested. Pick one element in front of you and mock it. "
                 "Do not describe the rest. Do not reply SILENT."
             )
 
@@ -1034,7 +1034,7 @@ class Pipeline:
         await self._notify()
 
         if vision.store_in_history and settings.llm.history_turns > 0:
-            self._history.append({"role": "user", "content": f"[camera] {observation.strip()}"})
+            self._history.append({"role": "user", "content": f"[in front of you] {observation.strip()}"})
             self._history.append({"role": "assistant", "content": stripped})
             self._trim_history(settings.llm.history_turns)
 
