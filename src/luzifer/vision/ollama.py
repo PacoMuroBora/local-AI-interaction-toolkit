@@ -163,8 +163,9 @@ class VisionOllama:
         client = await self._get_client(base_url)
         b64 = base64.b64encode(jpeg).decode("ascii")
         prompt = (settings.prompt or "").strip() or (
-            "Describe the scene in one or two short factual English sentences. "
-            "Name people, pose, clothing, objects, and background. No poetry."
+            "You are Luzifer. The person is standing in front of Luzifer. "
+            "One or two short factual sentences. If they face forward, they are looking at Luzifer. "
+            "Never write statue, sculpture, or camera. No room, no background."
         )
         options = runner_options(
             settings,
