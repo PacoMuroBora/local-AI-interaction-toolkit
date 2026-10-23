@@ -54,7 +54,7 @@ Header tabs:
 
 - **Audio In** — mic, VAD, Whisper size + download cache status  
 - **Audio Out** — TTS engine/voice, local monitor, Kokoro/Piper asset downloads  
-- **Prompt / LLM** — system prompt, sampling, history turns, Ollama model list + pull  
+- **Prompt / LLM** — system prompt (`{{current_goal}}` is the active aim), goal list and switch timer, sampling, history turns, Ollama model list + pull  
 - **Vision** — NDI source, external vs local-idle trigger, VLM model/prompt, inject-context  
 - **OSC** — out/in host and ports, plus the outbound and inbound message list  
 
@@ -148,7 +148,7 @@ If you still see `Failed to create CUDAExecutionProvider` / only `CPUExecutionPr
 
 1. **OSC In CHOP** — port `9000`. Int channels: `ai/listening`, `ai/user_speaking`, `ai/stt`, `ai/thinking`, `ai/synthesizing`, `ai/ai_speaking`, `ai/play`. Inactive flags are sent as `0`.
 2. **OSC In DAT** — same port if Windows delivers to both; strings (`state`, `user_text`, `ai_text`) only show up here.
-3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/ai/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`, `/vision`.
+3. **OSC Out DAT** — address `127.0.0.1`, port `9001`, send `/ai/in/say`, `/speak`, `/reset`, `/goal`, `/interrupt`, `/listen`, `/vision`.
 4. **Audio File In → Audio VST → Audio Device Out**, all Timeslice. File = `luzifer-backend\runtime\output\speech.wav` (overwritten each line). On `ai/play` off→on, reload, wait 1 frame, play. On on→off, stop. Leave **Monitor locally** off.
 5. `ai/in_level` and `ai/out_level` are 30 Hz floats on the same OSC In CHOP. Vision adds `ai/vision_text`, `ai/vision`, `ai/vision_active`. Full chain is in [OSC_SPEC.md](OSC_SPEC.md).
 6. Optional: **NDI Out TOP** → backend Vision tab. Pulse `/ai/in/vision 1` when your idle + presence logic says go.

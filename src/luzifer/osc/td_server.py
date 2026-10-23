@@ -13,6 +13,7 @@ from pythonosc.osc_server import AsyncIOOSCUDPServer
 ADDR_SAY = "/ai/in/say"
 ADDR_SPEAK = "/ai/in/speak"
 ADDR_RESET = "/ai/in/reset"
+ADDR_GOAL = "/ai/in/goal"
 ADDR_INTERRUPT = "/ai/in/interrupt"
 ADDR_LISTEN = "/ai/in/listen"
 ADDR_VISION = "/ai/in/vision"
@@ -33,8 +34,8 @@ class TouchDesignerOscServer:
 
     def _dispatch(self, address: str, *args: Any) -> None:
         value: Any = args[0] if args else None
-        # TD often streams /ai/in/vision 0 every frame — drop before scheduling.
-        if address == ADDR_VISION:
+        # TD often streams a held 0 every frame — drop before scheduling.
+        if address in (ADDR_VISION, ADDR_GOAL):
             fire = True
             if isinstance(value, (int, float)):
                 fire = bool(int(value))
@@ -70,6 +71,7 @@ class TouchDesignerOscServer:
         dispatcher.map(ADDR_SAY, self._dispatch)
         dispatcher.map(ADDR_SPEAK, self._dispatch)
         dispatcher.map(ADDR_RESET, self._dispatch)
+        dispatcher.map(ADDR_GOAL, self._dispatch)
         dispatcher.map(ADDR_INTERRUPT, self._dispatch)
         dispatcher.map(ADDR_LISTEN, self._dispatch)
         dispatcher.map(ADDR_VISION, self._dispatch)

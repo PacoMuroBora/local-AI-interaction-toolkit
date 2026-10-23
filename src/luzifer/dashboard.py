@@ -18,6 +18,7 @@ from luzifer.metrics import poll_gpu
 from luzifer.osc.td_server import (
     ADDR_INTERRUPT,
     ADDR_LISTEN,
+    ADDR_GOAL,
     ADDR_RESET,
     ADDR_SAY,
     ADDR_SPEAK,
@@ -60,6 +61,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .lang-card .hint { margin:0 0 .55rem; font-size:.72rem; color:#6e7681; }
     .hint { margin:.35rem 0 .55rem; font-size:.72rem; color:#6e7681; }
     .hint code { font-size:.7rem; }
+    .goal-live { display:flex; gap:.75rem 1rem; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+      background:#0f1115; border:1px solid #2a2f3a; border-radius:8px; padding:.75rem .85rem; margin:.35rem 0 .75rem; }
+    .goal-live .now { flex:1; min-width:16rem; font-size:.95rem; line-height:1.45; }
+    .goal-live .meta { display:flex; gap:.55rem; align-items:center; color:#9aa0a6; font-size:.8rem; font-variant-numeric:tabular-nums; }
+    .goal-warn { color:#d29922; font-size:.75rem; margin:.15rem 0 .55rem; }
+    #goals_items { min-height:14rem; }
     .vision-result {
       margin-top:.35rem; min-height:10rem; padding:.75rem .85rem;
       background:#0f1115; border:1px solid #2a2f3a; border-radius:8px;
@@ -67,6 +74,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
     .vision-result.empty { color:#6e7681; }
     h2 { margin:0 0 .75rem; font-size:1rem; color:#9aa0a6; text-transform:uppercase; letter-spacing:.04em; }
+    details.fold { background:#0f1115; border:1px solid #2a2f3a; border-radius:10px; margin:0 0 .65rem; }
+    details.fold > summary {
+      display:flex; align-items:center; gap:.55rem; cursor:pointer; list-style:none;
+      padding:.65rem .85rem; color:#9aa0a6; font-size:.78rem; font-weight:700;
+      letter-spacing:.04em; text-transform:uppercase; user-select:none;
+    }
+    details.fold > summary::-webkit-details-marker { display:none; }
+    details.fold > summary::before { content:"▸"; color:#6e7681; font-size:.85rem; width:.8rem; flex:0 0 auto; }
+    details.fold[open] > summary::before { content:"▾"; }
+    details.fold > summary:hover { color:#e8eaed; }
+    details.fold[open] > summary { border-bottom:1px solid #2a2f3a; margin-bottom:.15rem; }
+    details.fold > .fold-body { padding:.35rem .85rem .85rem; }
+    .fold-title { flex:0 0 auto; }
+    .fold-note {
+      flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      font-weight:500; letter-spacing:0; text-transform:none; color:#79b8ff; font-size:.75rem;
+    }
+    .fold-action { width:auto; margin-left:auto; padding:.28rem .65rem; font-size:.75rem; }
     label { display:block; font-size:.8rem; color:#9aa0a6; margin:.55rem 0 .2rem; }
     input, textarea, select { width:100%; box-sizing:border-box; background:#0f1115; color:#e8eaed;
       border:1px solid #2a2f3a; border-radius:8px; padding:.55rem .65rem; }
@@ -162,9 +187,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   <main>
     <section id="panel-audio-in" class="panel active">
-      <div class="grid">
-        <div>
-          <h2>Microphone / VAD</h2>
+      <details class="fold" open data-fold="mic">
+        <summary><span class="fold-title">Microphone / VAD</span></summary>
+        <div class="fold-body">
           <label>Input Device</label><select id="audio.input_device_id"></select>
           <label>Sample Rate</label><input id="audio.sample_rate" type="number" step="1" />
           <label>VAD Threshold</label><input id="audio.vad_threshold" type="number" step="0.05" />
@@ -174,8 +199,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Speaking Tail Pad (ms)</label><input id="audio.speaking_tail_pad_ms" type="number" step="50" />
           <p class="hint">Added after TTS duration before mic reopens. Negative = open mic early.</p>
         </div>
-        <div>
-          <h2>Whisper STT</h2>
+      </details>
+      <details class="fold" data-fold="whisper">
+        <summary><span class="fold-title">Whisper settings</span></summary>
+        <div class="fold-body">
           <label>Model Size</label>
           <select id="stt.model_size">
             <option>tiny</option><option>tiny.en</option>
@@ -198,16 +225,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <option value="int8_float16">int8_float16</option>
           </select>
           <label>Language (empty = auto)</label><input id="stt.language" />
-          <h2 style="margin-top:1rem">Whisper Cache</h2>
+        </div>
+      </details>
+      <details class="fold" data-fold="whisper-models">
+        <summary><span class="fold-title">Whisper models</span></summary>
+        <div class="fold-body">
           <div id="whisper-models" class="model-list"></div>
         </div>
-      </div>
+      </details>
     </section>
 
     <section id="panel-audio-out" class="panel">
-      <div class="grid">
-        <div>
-          <h2>TTS</h2>
+      <details class="fold" open data-fold="tts">
+        <summary><span class="fold-title">TTS settings</span></summary>
+        <div class="fold-body">
           <label>Provider</label>
           <select id="tts.provider">
             <option value="local">Local (Kokoro / Piper)</option>
@@ -294,19 +325,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             Monitor locally (play speech.wav on this machine)
           </label>
         </div>
-        <div id="tts-assets-col">
-          <h2>TTS Assets</h2>
+      </details>
+      <details class="fold" id="tts-assets-col" data-fold="tts-models">
+        <summary><span class="fold-title">TTS models</span></summary>
+        <div class="fold-body">
           <div id="tts-models" class="model-list"></div>
         </div>
-      </div>
+      </details>
     </section>
 
     <section id="panel-prompt-llm" class="panel">
-      <div class="grid">
-        <div>
-          <h2>System Prompt</h2>
+      <details class="fold" open data-fold="prompt">
+        <summary><span class="fold-title">System prompt</span></summary>
+        <div class="fold-body">
           <textarea id="system_prompt"></textarea>
-          <h2 style="margin-top:1rem">LLM</h2>
+          <p class="hint">Put <code>{{current_goal}}</code> where the active aim should land. That token is replaced each turn. Move it if you want the aim earlier or later.</p>
+        </div>
+      </details>
+      <details class="fold" data-fold="llm">
+        <summary><span class="fold-title">LLM settings</span></summary>
+        <div class="fold-body">
           <label>Base URL</label><input id="llm.base_url" />
           <label>Model</label><input id="llm.model" />
           <label>Temperature</label><input id="llm.temperature" type="number" step="0.05" />
@@ -317,8 +355,35 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>GPU layers</label><input id="llm.num_gpu" type="number" step="1" />
           <p class="hint">Ollama has no MB cap. GPU layers is the VRAM knob. <strong>99</strong> keeps every chat layer on the GPU. Saving reloads both runners, chat first.</p>
         </div>
-        <div>
-          <h2>Ollama Models</h2>
+      </details>
+      <details class="fold" data-fold="goals">
+        <summary>
+          <span class="fold-title">Goals</span>
+          <span id="goal_fold_note" class="fold-note"></span>
+        </summary>
+        <div class="fold-body">
+        <p class="hint">One aim at a time, injected only where a prompt contains <code>{{current_goal}}</code>. The same token works in the idle comment prompt. The timer advances to the next line. Reset does too, and clears history. <code>/ai/in/goal 1</code> skips the aim and keeps history. <strong>0</strong> seconds disables the timer.</p>
+        <p id="goal-token-warn" class="goal-warn" hidden>The system prompt has no <code>{{current_goal}}</code> token, so the aim is not injected.</p>
+        <div class="goal-live">
+          <div class="now" id="goal_now">—</div>
+          <div class="meta">
+            <span id="goal_meta"></span>
+            <button id="goal_next" class="secondary fold-action" type="button">Next</button>
+          </div>
+        </div>
+        <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
+          <input id="goals.enabled" type="checkbox" style="width:auto" />
+          Enabled
+        </label>
+        <label>Switch every (s)</label>
+        <input id="goals.interval_s" type="number" step="5" min="0" />
+        <label>List (one goal per line)</label>
+        <textarea id="goals_items"></textarea>
+        </div>
+      </details>
+      <details class="fold" data-fold="ollama">
+        <summary><span class="fold-title">Ollama models</span></summary>
+        <div class="fold-body">
           <div class="row">
             <input id="pull_name" placeholder="model name to pull…" style="flex:1" />
             <button id="pull_btn" type="button">Pull</button>
@@ -326,13 +391,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div id="llm-models" class="model-list"></div>
         </div>
-      </div>
+      </details>
     </section>
 
     <section id="panel-vision" class="panel">
-      <div class="grid">
-        <div>
-          <h2>NDI Vision</h2>
+      <details class="fold" open data-fold="vision-ndi">
+        <summary><span class="fold-title">NDI settings</span></summary>
+        <div class="fold-body">
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem">
             <input id="vision.enabled" type="checkbox" style="width:auto" />
             Enabled
@@ -355,8 +420,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Change Threshold (0 = off)</label><input id="vision.change_threshold" type="number" step="0.5" />
           <label>Max Caption Age (s)</label><input id="vision.max_age_s" type="number" step="1" />
         </div>
-        <div>
-          <h2>Vision Model</h2>
+      </details>
+      <details class="fold" data-fold="vision-model">
+        <summary><span class="fold-title">Vision model</span></summary>
+        <div class="fold-body">
           <label>Ollama VLM</label><input id="vision.model" placeholder="moondream" />
           <label>JPEG Max Edge</label><input id="vision.jpeg_max_edge" type="number" step="32" />
           <label>Num Predict</label><input id="vision.num_predict" type="number" step="1" />
@@ -372,7 +439,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <input id="vision.store_in_history" type="checkbox" style="width:auto" />
             Store vision comments in chat history
           </label>
-          <h2 style="margin-top:1rem">Manual</h2>
+        </div>
+      </details>
+      <details class="fold" open data-fold="vision-manual">
+        <summary><span class="fold-title">Manual</span></summary>
+        <div class="fold-body">
           <div class="row">
             <button id="vision_analyze" type="button">Analyze</button>
             <button id="vision_comment" type="button">Analyze + Comment</button>
@@ -381,29 +452,40 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <p class="hint">Buttons force a grab now (ignore trigger / idle). Comment also speaks.</p>
         </div>
-      </div>
-      <div class="grid" style="margin-top:1rem">
-        <div>
-          <h2>Caption Prompt</h2>
+      </details>
+      <details class="fold" data-fold="vision-caption">
+        <summary><span class="fold-title">Caption prompt</span></summary>
+        <div class="fold-body">
           <textarea id="vision.prompt" rows="8" style="min-height:10rem"></textarea>
-          <h2 style="margin-top:1rem">Idle Comment Prompt</h2>
-          <p class="hint">Replaces the main system prompt when Luzifer speaks on its own. Visitor replies keep the main prompt, plus the latest caption as a private fact.</p>
+        </div>
+      </details>
+      <details class="fold" data-fold="vision-idle">
+        <summary><span class="fold-title">Idle comment prompt</span></summary>
+        <div class="fold-body">
+          <p class="hint">Replaces the main system prompt when Luzifer speaks on its own. Visitor replies keep the main prompt, plus the latest caption as a private fact. <code>{{current_goal}}</code> is replaced here too.</p>
           <textarea id="vision.idle_prompt" rows="8" style="min-height:10rem"></textarea>
         </div>
-        <div>
-          <h2>Analysis Result</h2>
+      </details>
+      <details class="fold" open data-fold="vision-result">
+        <summary><span class="fold-title">Analysis result</span></summary>
+        <div class="fold-body">
           <div id="vision_result" class="vision-result">No analysis yet.</div>
         </div>
-      </div>
+      </details>
     </section>
 
     <section id="panel-osc" class="panel">
-      <div class="grid">
-        <div>
-          <h2>Toolkit → TD</h2>
+      <details class="fold" open data-fold="osc-out">
+        <summary><span class="fold-title">Toolkit → TD</span></summary>
+        <div class="fold-body">
           <p class="hint">UDP out. Point a TD <strong>OSC In</strong> CHOP (ints/floats) and DAT (strings) at this host and port. Ints are <code>0</code>/<code>1</code>, not OSC bool — a bool has no payload and the CHOP often never makes a channel. Flag snapshots send every flag, so an inactive one is explicit <code>0</code>.</p>
           <label>Host</label><input id="osc.host" placeholder="127.0.0.1" />
           <label>Port</label><input id="osc.port" type="number" placeholder="9000" />
+        </div>
+      </details>
+      <details class="fold" data-fold="osc-out-map">
+        <summary><span class="fold-title">Outbound addresses</span></summary>
+        <div class="fold-body">
           <table class="io-table">
             <thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead>
             <tbody>
@@ -425,24 +507,32 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </tbody>
           </table>
         </div>
-        <div>
-          <h2>TD → Toolkit</h2>
+      </details>
+      <details class="fold" open data-fold="osc-in">
+        <summary><span class="fold-title">TD → toolkit</span></summary>
+        <div class="fold-body">
           <p class="hint">UDP in. TD <strong>OSC Out</strong> DAT, network address and port below. One message per send: address plus one argument. <code>/ai/in/vision 0</code> is ignored (TD often streams it every frame).</p>
           <label>Listen host</label><input id="osc.listen_host" placeholder="127.0.0.1" />
           <label>Listen port</label><input id="osc.listen_port" type="number" placeholder="9001" />
+        </div>
+      </details>
+      <details class="fold" data-fold="osc-in-map">
+        <summary><span class="fold-title">Inbound addresses</span></summary>
+        <div class="fold-body">
           <table class="io-table">
             <thead><tr><th>Address</th><th>Arg</th><th>What it does</th></tr></thead>
             <tbody>
               <tr><td><code>/ai/in/say</code></td><td class="typ">string</td><td>Visitor line. Skips mic and STT. Runs LLM, TTS, then <code>/ai/play</code>. Appends chat history.</td></tr>
               <tr><td><code>/ai/in/speak</code></td><td class="typ">string</td><td>TTS only. No LLM, no history.</td></tr>
-              <tr><td><code>/ai/in/reset</code></td><td class="typ">int 1</td><td>Clear chat history and empty the transcript fields.</td></tr>
+              <tr><td><code>/ai/in/reset</code></td><td class="typ">int 1</td><td>Clear chat history, empty the transcript fields, and advance to the next goal.</td></tr>
+              <tr><td><code>/ai/in/goal</code></td><td class="typ">int 1</td><td>Skip to the next goal. History stays. <code>0</code> is ignored.</td></tr>
               <tr><td><code>/ai/in/interrupt</code></td><td class="typ">int 1</td><td>Abort think or speak and return to listening.</td></tr>
               <tr><td><code>/ai/in/listen</code></td><td class="typ">int</td><td><code>1</code> unmutes the mic, <code>0</code> mutes it.</td></tr>
               <tr><td><code>/ai/in/vision</code></td><td class="typ">int 1</td><td>Grab an NDI still, caption it, speak a reaction. Only when vision is enabled and trigger is <code>external</code>.</td></tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </section>
   </main>
 
@@ -466,7 +556,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <span class="direct-play-label">Direct playback</span>
       </label>
     </div>
-    <div class="live"><strong>User:</strong> <span id="user_lang" style="opacity:.55;margin-right:.35rem"></span><span id="user_text"></span></div>
+    <div class="live"><strong>Goal:</strong> <span id="goal_now_footer"></span> <span id="goal_remaining_footer" style="opacity:.65"></span></div>
+    <div class="live" style="margin-top:.5rem"><strong>User:</strong> <span id="user_lang" style="opacity:.55;margin-right:.35rem"></span><span id="user_text"></span></div>
     <div class="live" style="margin-top:.5rem"><strong>AI:</strong> <span id="ai_text"></span></div>
     <div class="live" style="margin-top:.5rem"><strong>Vision:</strong> <span id="vision_text" style="opacity:.85"></span></div>
     <div class="debug">
@@ -479,7 +570,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button id="vision_analyze_footer" class="secondary" type="button">Analyze</button>
       <button id="vision_comment_footer" class="secondary" type="button">Analyze + Comment</button>
       <button id="interrupt" class="secondary" type="button">Interrupt</button>
-      <button id="reset" class="danger" type="button">Reset session</button>
+      <button id="reset" class="danger" type="button" title="Clear history and advance to the next goal">Reset session</button>
     </div>
   </footer>
 
@@ -489,6 +580,7 @@ const PATHS = [
   "system_prompt",
   "llm.model","llm.base_url","llm.temperature","llm.top_p","llm.max_tokens","llm.history_turns",
   "llm.num_ctx","llm.num_gpu",
+  "goals.interval_s",
   "audio.sample_rate","audio.vad_threshold","audio.silence_duration_ms","audio.vad_preroll_ms","audio.speaking_tail_pad_ms",
   "stt.model_size","stt.device","stt.compute_type","stt.language",
   "tts.provider","tts.speed","tts.device","tts.compute_type","tts.output_path",
@@ -854,6 +946,10 @@ async function loadConfig(){
     elCfg.voice_id || ""
   );
   syncTtsProviderUi();
+  const g = cfg.goals || {};
+  document.getElementById("goals.enabled").checked = g.enabled !== false;
+  document.getElementById("goals_items").value = (g.items || []).join("\\n");
+  refreshGoalTokenWarn();
   const v = cfg.vision || {};
   document.getElementById("vision.enabled").checked = !!v.enabled;
   document.getElementById("vision.inject_context").checked = v.inject_context !== false;
@@ -903,6 +999,13 @@ async function collectConfig(){
   cfg.tts.elevenlabs.similarity_boost = Number(document.getElementById("tts.elevenlabs.similarity_boost").value);
   const lang = document.getElementById("stt.language").value;
   cfg.stt.language = lang === "" ? null : lang;
+  cfg.goals = cfg.goals || {};
+  cfg.goals.enabled = document.getElementById("goals.enabled").checked;
+  cfg.goals.interval_s = Number(document.getElementById("goals.interval_s").value);
+  cfg.goals.items = document.getElementById("goals_items").value
+    .split(/\\r?\\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
   cfg.vision = cfg.vision || {};
   cfg.vision.enabled = document.getElementById("vision.enabled").checked;
   cfg.vision.inject_context = document.getElementById("vision.inject_context").checked;
@@ -987,6 +1090,60 @@ document.getElementById("interrupt").onclick = async () => {
 document.getElementById("reset").onclick = async () => {
   await fetch("/api/session/reset", {method:"POST"});
   setStatus("session reset");
+};
+function refreshGoalTokenWarn(){
+  const prompt = document.getElementById("system_prompt").value || "";
+  const warn = document.getElementById("goal-token-warn");
+  if (warn) warn.hidden = prompt.includes("{{current_goal}}");
+}
+document.getElementById("system_prompt").addEventListener("input", refreshGoalTokenWarn);
+function applyGoal(goal){
+  if (!goal) return;
+  const text = (goal.text || "").trim();
+  const n = goal.count ? `${(goal.index || 0) + 1} / ${goal.count}` : "";
+  const rem = goal.timer_on && goal.remaining_s != null
+    ? `next in ${Math.max(0, Math.ceil(goal.remaining_s))}s`
+    : "";
+  const now = document.getElementById("goal_now");
+  if (now) now.textContent = !goal.enabled ? "Goals off." : (text || "No goals in the list.");
+  const meta = document.getElementById("goal_meta");
+  if (meta) meta.textContent = [n, rem].filter(Boolean).join(" · ");
+  const foot = document.getElementById("goal_now_footer");
+  if (foot) foot.textContent = !goal.enabled ? "off" : (text || "none");
+  const footRem = document.getElementById("goal_remaining_footer");
+  if (footRem) {
+    const bits = [n, rem].filter(Boolean).join(" · ");
+    footRem.textContent = bits ? `(${bits})` : "";
+  }
+  const note = document.getElementById("goal_fold_note");
+  if (note) {
+    const label = !goal.enabled ? "off" : (text || "none");
+    const bits = [n, rem].filter(Boolean).join(" · ");
+    note.textContent = bits ? `${bits} · ${label}` : label;
+  }
+}
+function initFolds(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("luzifer.folds") || "{}"); }
+  catch (e) { saved = {}; }
+  document.querySelectorAll("details.fold").forEach(el => {
+    const id = el.getAttribute("data-fold");
+    if (!id) return;
+    if (Object.prototype.hasOwnProperty.call(saved, id)) el.open = !!saved[id];
+    el.addEventListener("toggle", () => {
+      let all = {};
+      try { all = JSON.parse(localStorage.getItem("luzifer.folds") || "{}"); }
+      catch (e) { all = {}; }
+      all[id] = el.open;
+      localStorage.setItem("luzifer.folds", JSON.stringify(all));
+    });
+  });
+}
+document.getElementById("goal_next").onclick = async () => {
+  const res = await fetch("/api/goals/next", {method:"POST"});
+  const data = await res.json();
+  if (data.goal) applyGoal(data.goal);
+  setStatus(res.ok ? "next goal" : "goal switch failed");
 };
 function setVisionResult(text){
   const el = document.getElementById("vision_result");
@@ -1095,6 +1252,7 @@ function connectWs(){
     if ("warmup" in msg) applyWarmup(msg.warmup);
     if (msg.type === "metrics") {
       applyMetrics(msg);
+      if (msg.goal) applyGoal(msg.goal);
       if ("vision_text" in msg) setVisionResult(msg.vision_text || "");
       if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg
           || "vision_analyzing" in msg) {
@@ -1102,6 +1260,7 @@ function connectWs(){
       }
       return;
     }
+    if (msg.goal) applyGoal(msg.goal);
     if (msg.state) document.getElementById("state").textContent = msg.state;
     if ("user_text" in msg) document.getElementById("user_text").textContent = msg.user_text || "";
     if ("language" in msg) {
@@ -1126,6 +1285,7 @@ function connectWs(){
   };
   ws.onclose = () => setTimeout(connectWs, 1500);
 }
+initFolds();
 loadConfig();
 connectWs();
 </script>
@@ -1208,6 +1368,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "vision_analyzing": pipeline.vision_analyzing,
                 "vision_ready": pipeline.vision_ready,
                 "warmup": pipeline.warmup_status(),
+                "goal": pipeline.goal_status(),
             }
         )
 
@@ -1253,6 +1414,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 payload["vision_text"] = pipeline.observations.text
                 payload["state"] = pipeline.state
                 payload["warmup"] = pipeline.warmup_status()
+                pipeline.tick_goal()
+                payload["goal"] = pipeline.goal_status()
                 await hub.broadcast(payload)
                 await asyncio.sleep(0.5)
 
@@ -1394,6 +1557,11 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
         await pipeline.reset_session()
         return {"status": "ok"}
 
+    @app.post("/api/goals/next")
+    async def goals_next() -> dict[str, Any]:
+        await pipeline.skip_goal("next")
+        return {"status": "ok", "goal": pipeline.goal_status()}
+
     @app.get("/api/vision/sources")
     async def vision_sources() -> list[str]:
         return await asyncio.to_thread(list_ndi_sources, 5.0)
@@ -1427,6 +1595,7 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "vision_analyzing": pipeline.vision_analyzing,
                     "vision_ready": pipeline.vision_ready,
                     "warmup": pipeline.warmup_status(),
+                    "goal": pipeline.goal_status(),
                 }
             )
         )
@@ -1470,6 +1639,10 @@ def _make_osc_handler(pipeline: Pipeline):
         elif address == ADDR_RESET:
             logger.info("OSC in {}", address)
             await pipeline.reset_session()
+        elif address == ADDR_GOAL:
+            # Zeros already filtered in td_server._dispatch
+            logger.info("OSC in {} → next goal", address)
+            await pipeline.skip_goal("osc")
         elif address == ADDR_INTERRUPT:
             logger.info("OSC in {}", address)
             await pipeline.interrupt()

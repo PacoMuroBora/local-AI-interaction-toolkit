@@ -51,8 +51,8 @@ class ObservationStore:
             return ""
         return (
             "\n\nWhat you currently see (private fact, not someone speaking). "
-            "Use at most one detail, and only if it serves this reply. "
-            "Do not narrate the room or invent beyond it:\n"
+            "Yes-and one detail as a prop in the reply. Do not recite the note, "
+            "do not mention the room, and do not add people or objects that are not in it:\n"
             f"{obs.text}"
         )
 

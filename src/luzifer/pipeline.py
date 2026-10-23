@@ -14,6 +14,7 @@ from loguru import logger
 
 from luzifer.audio.vad import VoiceActivityDetector
 from luzifer.config import DEFAULT_IDLE_PROMPT, ConfigStore, TtsSettings, VisionSettings
+from luzifer.goals import GOAL_TOKEN, GoalClock, apply_goal_placeholder
 from luzifer.llm.ollama import ChatMessage, OllamaEngine, models_match
 from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
@@ -176,6 +177,8 @@ class Pipeline:
         self._vision_busy = False
         self._caption_lock = asyncio.Lock()
         self._vision_listeners: list[Callable[[], Awaitable[None] | None]] = []
+        self.goals = GoalClock()
+        self._goal_token_warned: set[str] = set()
 
     def on_state(self, listener: StateListener) -> None:
         self._listeners.append(listener)
@@ -337,7 +340,43 @@ class Pipeline:
         if len(self._history) > max_messages:
             self._history = self._history[-max_messages:]
 
+    def goal_status(self) -> dict[str, Any]:
+        return self.goals.status(self.store.settings.goals)
+
+    def advance_goal(self, reason: str) -> str:
+        text = self.goals.advance(self.store.settings.goals)
+        logger.info("Goal ({}) → {}", reason, text[:120] if text else "(none)")
+        return text
+
+    async def skip_goal(self, reason: str = "skip") -> str:
+        """Next aim, history kept. OSC /ai/in/goal and the dashboard Next button."""
+        text = self.advance_goal(reason)
+        await self._notify()
+        return text
+
+    def tick_goal(self) -> str | None:
+        text = self.goals.tick(self.store.settings.goals)
+        if text:
+            logger.info("Goal (timer) → {}", text[:120])
+        return text
+
+    def _prompt_with_goal(self, prompt: str, *, slot: str) -> str:
+        """Swap {{current_goal}} for the active aim. Missing token leaves the prompt alone."""
+        goals = self.store.settings.goals
+        self.tick_goal()
+        goal = self.goals.text(goals) if goals.enabled else ""
+        rendered, found = apply_goal_placeholder(prompt, goal)
+        if goals.enabled and goal and not found and slot not in self._goal_token_warned:
+            self._goal_token_warned.add(slot)
+            logger.warning(
+                "{} has no {} placeholder; the aim is not injected",
+                slot,
+                GOAL_TOKEN,
+            )
+        return rendered
+
     async def _clear_session(self) -> None:
+        self.advance_goal("reset")
         self._history.clear()
         self._last_idle_comment = ""
         self.last_user_text = ""
@@ -527,6 +566,7 @@ class Pipeline:
             self._level_task = asyncio.create_task(self._stream_levels(), name="levels")
             self._vision_task = asyncio.create_task(self._vision_loop(), name="vision")
             logger.info("Pipeline ready")
+            logger.info("Goal → {}", self.goals.text(settings.goals)[:120] or "(none)")
 
             while self._running:
                 try:
@@ -700,7 +740,8 @@ class Pipeline:
         await self.set_state("thinking")
         history = list(self._history) if settings.llm.history_turns > 0 else []
         # Language instruction is per-call only — not stored in history / not averaged.
-        system = settings.system_prompt + language_system_suffix(self.last_language)
+        system = self._prompt_with_goal(settings.system_prompt, slot="system prompt")
+        system += language_system_suffix(self.last_language)
         if settings.vision.enabled and settings.vision.inject_context:
             system += self.observations.context_block(settings.vision.max_age_s)
         try:
@@ -985,7 +1026,10 @@ class Pipeline:
             )
         # Idle aside does not inherit the visitor prompt (that one interviews)
         # and does not see chat history (that one continues the interview).
-        system = idle_system_prompt(vision, self.last_language)
+        system = self._prompt_with_goal(
+            idle_system_prompt(vision, self.last_language),
+            slot="idle prompt",
+        )
         if force:
             system += (
                 "\n\nThis comment was requested. Pick one element in front of you and mock it. "

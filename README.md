@@ -33,6 +33,6 @@ docs/                 # setup + OSC spec
 | Direction | Default | Addresses |
 |-----------|---------|-----------|
 | → TD | `127.0.0.1:9000` | `/ai/state`, `/user_text`, `/ai_text`, `/listening`, `/user_speaking`, `/stt`, `/thinking`, `/synthesizing`, `/ai_speaking`, `/play`, `/in_level`, `/out_level`, `/vision_text`, `/vision`, `/vision_active` |
-| ← TD | `127.0.0.1:9001` | `/ai/in/say`, `/speak`, `/reset`, `/interrupt`, `/listen`, `/vision` |
+| ← TD | `127.0.0.1:9001` | `/ai/in/say`, `/speak`, `/reset`, `/goal`, `/interrupt`, `/listen`, `/vision` |
 
 Full table + TD wiring: [docs/OSC_SPEC.md](docs/OSC_SPEC.md)
