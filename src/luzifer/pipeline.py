@@ -14,7 +14,7 @@ from loguru import logger
 
 from luzifer.audio.vad import VoiceActivityDetector
 from luzifer.config import DEFAULT_IDLE_PROMPT, ConfigStore, TtsSettings, VisionSettings
-from luzifer.goals import GOAL_TOKEN, GoalClock, apply_goal_placeholder
+from luzifer.goals import GOAL_TOKEN, GoalClock, apply_goal_placeholder, insert_before_goal
 from luzifer.llm.ollama import ChatMessage, OllamaEngine, models_match
 from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
@@ -22,7 +22,7 @@ from luzifer.stt.whisper import WhisperEngine
 from luzifer.tts.kokoro import TtsEngine
 from luzifer.vision.frames import frame_changed, jpeg_bytes, mean_abs_diff
 from luzifer.vision.ndi import NdiGrabber
-from luzifer.vision.observation import ObservationStore
+from luzifer.vision.observation import VISION_TOKEN, ObservationStore, apply_vision_placeholder
 from luzifer.vision.ollama import VisionOllama, is_usable_caption
 
 StateName = Literal["loading", "listening", "stt", "thinking", "synthesizing", "speaking"]
@@ -102,7 +102,7 @@ def _vision_reply_silent(text: str) -> bool:
 def idle_system_prompt(vision: VisionSettings, lang: str | None) -> str:
     """Camera aside. The visitor system prompt is not included."""
     text = (vision.idle_prompt or "").strip() or DEFAULT_IDLE_PROMPT
-    return text + language_system_suffix(lang)
+    return insert_before_goal(text, language_system_suffix(lang))
 
 
 # After VAD drops user_speaking, cover the handoff into STT so a caption
@@ -179,6 +179,7 @@ class Pipeline:
         self._vision_listeners: list[Callable[[], Awaitable[None] | None]] = []
         self.goals = GoalClock()
         self._goal_token_warned: set[str] = set()
+        self._vision_token_warned = False
 
     def on_state(self, listener: StateListener) -> None:
         self._listeners.append(listener)
@@ -359,6 +360,14 @@ class Pipeline:
         if text:
             logger.info("Goal (timer) → {}", text[:120])
         return text
+
+    def _advance_spoken_beat(self) -> None:
+        """Count this spoken reply toward the beat. The beat changes after its hold."""
+        if self._interrupt.is_set():
+            return
+        stepped = self.goals.advance_beat(self.store.settings.goals)
+        if stepped:
+            logger.info("Goal beat → {}", stepped[:120])
 
     def _prompt_with_goal(self, prompt: str, *, slot: str) -> str:
         """Swap {{current_goal}} for the active aim. Missing token leaves the prompt alone."""
@@ -739,11 +748,25 @@ class Pipeline:
 
         await self.set_state("thinking")
         history = list(self._history) if settings.llm.history_turns > 0 else []
-        # Language instruction is per-call only — not stored in history / not averaged.
-        system = self._prompt_with_goal(settings.system_prompt, slot="system prompt")
-        system += language_system_suffix(self.last_language)
+        # {{vision}} is where the caption lands. Language stays just before the beat.
+        vision_block = ""
         if settings.vision.enabled and settings.vision.inject_context:
-            system += self.observations.context_block(settings.vision.max_age_s)
+            vision_block = self.observations.context_block(settings.vision.max_age_s)
+        system, vision_found = apply_vision_placeholder(settings.system_prompt, vision_block)
+        if (
+            vision_block
+            and not vision_found
+            and not self._vision_token_warned
+        ):
+            self._vision_token_warned = True
+            logger.warning(
+                "system prompt has no {} placeholder; the caption is not injected",
+                VISION_TOKEN,
+            )
+        system = self._prompt_with_goal(
+            insert_before_goal(system, language_system_suffix(self.last_language)),
+            slot="system prompt",
+        )
         try:
             ai_text = await self.llm.chat(
                 user_text,
@@ -769,6 +792,8 @@ class Pipeline:
             self._trim_history(settings.llm.history_turns)
 
         await self._speak_text(ai_text)
+        self._advance_spoken_beat()
+        await self._notify()
 
     async def _run_speak_only(self, text: str) -> None:
         self.last_ai_text = text
@@ -1026,15 +1051,14 @@ class Pipeline:
             )
         # Idle aside does not inherit the visitor prompt (that one interviews)
         # and does not see chat history (that one continues the interview).
-        system = self._prompt_with_goal(
-            idle_system_prompt(vision, self.last_language),
-            slot="idle prompt",
-        )
+        system = idle_system_prompt(vision, self.last_language)
         if force:
-            system += (
+            system = insert_before_goal(
+                system,
                 "\n\nThis comment was requested. Pick one element in front of you and mock it. "
-                "Do not describe the rest. Do not reply SILENT."
+                "Do not describe the rest. Do not reply SILENT.",
             )
+        system = self._prompt_with_goal(system, slot="idle prompt")
 
         await self.set_state("thinking")
         logger.info("Vision comment force={} (visitor prompt and history omitted)", force)

@@ -1,4 +1,7 @@
-"""One active aim at a time. The prompt opts in with {{current_goal}}."""
+"""One active campaign at a time. A beat stays for ``hold`` spoken replies.
+
+A campaign line is ``title | beat | beat``. The prompt opts in with {{current_goal}}.
+"""
 
 from __future__ import annotations
 
@@ -22,17 +25,33 @@ def clean_goals(items: list[str] | None) -> list[str]:
     return out
 
 
+def split_campaign(item: str) -> tuple[str, list[str]]:
+    """``title | beat | beat``. A line with no bar is a one-beat campaign."""
+    parts = [part.strip() for part in str(item or "").split("|") if part.strip()]
+    if not parts:
+        return "", []
+    if len(parts) == 1:
+        return parts[0], parts
+    return parts[0], parts[1:]
+
+
 def render_goal_block(goal: str) -> str:
-    """Model-facing aim. Empty when there is nothing to pursue."""
+    """Model-facing beat. Empty when there is nothing to pursue."""
     text = (goal or "").strip()
     if not text:
         return ""
-    return (
-        "Current aim, private. Do not name it and do not say you have one. "
-        f"{text} "
-        "This replaces any earlier aim. One move toward it in this reply. "
-        "If they are not there yet, take the single step that gets you closer."
-    )
+    return f"Private. Do not say this. {text}"
+
+
+def insert_before_goal(prompt: str, extra: str) -> str:
+    """Place extra immediately before {{current_goal}} so the beat stays last."""
+    extra = extra or ""
+    prompt = prompt or ""
+    if not extra:
+        return prompt
+    if GOAL_TOKEN in prompt:
+        return prompt.replace(GOAL_TOKEN, f"{extra}\n\n{GOAL_TOKEN}", 1)
+    return prompt + extra
 
 
 def apply_goal_placeholder(prompt: str, goal: str) -> tuple[str, bool]:
@@ -48,20 +67,40 @@ def apply_goal_placeholder(prompt: str, goal: str) -> tuple[str, bool]:
 
 @dataclass
 class GoalClock:
-    """Sequential aims. Timer and reset both advance; a one-item list stays put."""
+    """Sequential campaigns. A beat covers ``hold`` replies. Timer and reset change the campaign."""
 
     index: int = 0
+    beat: int = 0
+    # Spoken replies already spent on the current beat.
+    uses: int = 0
     started_at: float = field(default_factory=time.monotonic)
     _timer_on: bool | None = None
 
-    def text(self, goals: GoalsSettings) -> str:
+    def _parts(self, goals: GoalsSettings) -> tuple[str, list[str]]:
         items = clean_goals(goals.items)
         if not items:
+            self.index = 0
+            self.beat = 0
+            self.uses = 0
+            return "", []
+        self.index %= len(items)
+        title, beats = split_campaign(items[self.index])
+        if not beats:
+            self.beat = 0
+            self.uses = 0
+            return title, []
+        self.beat %= len(beats)
+        return title, beats
+
+    def text(self, goals: GoalsSettings) -> str:
+        """The beat injected into the prompt."""
+        _, beats = self._parts(goals)
+        if not beats:
             return ""
-        return items[self.index % len(items)]
+        return beats[self.beat]
 
     def tick(self, goals: GoalsSettings, now: float | None = None) -> str | None:
-        """Advance on the interval. Returns the new aim, or None if it did not move."""
+        """Advance the campaign on the interval. Returns the new beat, or None if it did not move."""
         now = time.monotonic() if now is None else now
         items = clean_goals(goals.items)
         running = bool(goals.enabled and goals.interval_s > 0 and len(items) > 1)
@@ -73,7 +112,7 @@ class GoalClock:
             self._timer_on = False
             return None
         if not self._timer_on:
-            # Timer just started. Do not skip the aim that is already showing.
+            # Timer just started. Do not skip the campaign that is already showing.
             self._timer_on = True
             self.started_at = now
             return None
@@ -83,12 +122,16 @@ class GoalClock:
         steps = int(elapsed // goals.interval_s)
         self.index = (self.index + steps) % len(items)
         self.started_at += steps * float(goals.interval_s)
-        return items[self.index]
+        self.beat = 0
+        self.uses = 0
+        return self.text(goals)
 
     def advance(self, goals: GoalsSettings, now: float | None = None) -> str:
-        """Next aim, wrapping. Resets the timer. A single aim stays and the clock restarts."""
+        """Next campaign, wrapping. Resets the beat and the timer."""
         now = time.monotonic() if now is None else now
         items = clean_goals(goals.items)
+        self.beat = 0
+        self.uses = 0
         if not items:
             self.index = 0
             self.started_at = now
@@ -98,13 +141,32 @@ class GoalClock:
         else:
             self.index = (self.index + 1) % len(items)
         self.started_at = now
-        return items[self.index]
+        return self.text(goals)
+
+    def advance_beat(self, goals: GoalsSettings) -> str | None:
+        """Count a spoken reply. Returns the new beat only when the hold is spent."""
+        if not goals.enabled:
+            return None
+        _, beats = self._parts(goals)
+        if not beats:
+            return None
+        hold = max(1, int(goals.hold))
+        self.uses += 1
+        if self.uses < hold:
+            return None
+        self.uses = 0
+        if len(beats) <= 1:
+            self.beat = 0
+            return None
+        self.beat = (self.beat + 1) % len(beats)
+        return beats[self.beat]
 
     def status(self, goals: GoalsSettings, now: float | None = None) -> dict[str, Any]:
         now = time.monotonic() if now is None else now
         items = clean_goals(goals.items)
         count = len(items)
-        index = self.index % count if count else 0
+        title, beats = self._parts(goals)
+        beat_count = len(beats)
         timer_on = bool(goals.enabled and goals.interval_s > 0 and count > 1)
         remaining: float | None = None
         if timer_on:
@@ -112,8 +174,13 @@ class GoalClock:
             remaining = max(0.0, float(goals.interval_s) - elapsed)
         return {
             "enabled": bool(goals.enabled),
-            "text": items[index] if count else "",
-            "index": index,
+            "text": beats[self.beat] if beat_count else "",
+            "campaign": title,
+            "beat": self.beat if beat_count else 0,
+            "beat_count": beat_count,
+            "uses": self.uses,
+            "hold": max(1, int(goals.hold)),
+            "index": self.index if count else 0,
             "count": count,
             "interval_s": float(goals.interval_s),
             "remaining_s": None if remaining is None else round(remaining, 1),

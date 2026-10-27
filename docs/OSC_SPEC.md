@@ -125,8 +125,8 @@ Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message pe
 |---------|-----|--------------|
 | `/ai/in/say` | string | Visitor line. Skips mic/STT. Runs LLM + TTS + `/ai/play`. Appends chat history. |
 | `/ai/in/speak` | string | Say this line with TTS only. No LLM, no history. |
-| `/ai/in/reset` | int `1` | Clear chat history, empty transcript fields, and advance to the next goal. |
-| `/ai/in/goal` | int `1` | Skip to the next goal. Chat history stays. `0` is ignored. |
+| `/ai/in/reset` | int `1` | Clear chat history, empty transcript fields, and advance to the next campaign. |
+| `/ai/in/goal` | int `1` | Skip to the next campaign. The beat resets. Chat history stays. `0` is ignored. |
 | `/ai/in/interrupt` | int `1` | Abort think/speak, return to `listening`. |
 | `/ai/in/listen` | int `1` or `0` | Unmute (`1`) or mute (`0`) the microphone. |
 | `/ai/in/vision` | int `1` | Grab NDI still, caption, speak a reaction. Only when `vision.enabled` and `vision.trigger=external`. TD should gate on idle + presence. |

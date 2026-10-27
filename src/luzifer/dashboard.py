@@ -339,7 +339,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <summary><span class="fold-title">System prompt</span></summary>
         <div class="fold-body">
           <textarea id="system_prompt"></textarea>
-          <p class="hint">Put <code>{{current_goal}}</code> where the active aim should land. That token is replaced each turn. Move it if you want the aim earlier or later.</p>
+          <p class="hint">Put <code>{{current_goal}}</code> where the active beat should land, and <code>{{vision}}</code> where the latest caption should land. Both are replaced each turn. Move them to change the order.</p>
         </div>
       </details>
       <details class="fold" data-fold="llm">
@@ -362,7 +362,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <span id="goal_fold_note" class="fold-note"></span>
         </summary>
         <div class="fold-body">
-        <p class="hint">One aim at a time, injected only where a prompt contains <code>{{current_goal}}</code>. The same token works in the idle comment prompt. The timer advances to the next line. Reset does too, and clears history. <code>/ai/in/goal 1</code> skips the aim and keeps history. <strong>0</strong> seconds disables the timer.</p>
+        <p class="hint">One campaign at a time. A line is <code>title | beat | beat</code>. Each beat stays for two visitor replies, then the next beat, then it wraps. The timer, Reset, and <code>/ai/in/goal 1</code> skip to the next campaign and start at its first beat. Reset also clears history. <strong>0</strong> seconds disables the timer. The beat is injected only where a prompt contains <code>{{current_goal}}</code>.</p>
         <p id="goal-token-warn" class="goal-warn" hidden>The system prompt has no <code>{{current_goal}}</code> token, so the aim is not injected.</p>
         <div class="goal-live">
           <div class="now" id="goal_now">—</div>
@@ -377,7 +377,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </label>
         <label>Switch every (s)</label>
         <input id="goals.interval_s" type="number" step="5" min="0" />
-        <label>List (one goal per line)</label>
+        <label>Campaigns (one per line, beats separated by |)</label>
         <textarea id="goals_items"></textarea>
         </div>
       </details>
@@ -462,7 +462,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <details class="fold" data-fold="vision-idle">
         <summary><span class="fold-title">Idle comment prompt</span></summary>
         <div class="fold-body">
-          <p class="hint">Replaces the main system prompt when Luzifer speaks on its own. Visitor replies keep the main prompt, plus the latest caption as a private fact. <code>{{current_goal}}</code> is replaced here too.</p>
+          <p class="hint">Replaces the main system prompt when Luzifer speaks on its own. Visitor replies keep the main prompt. The caption is injected only where that prompt contains <code>{{vision}}</code>. <code>{{current_goal}}</code> is replaced here too.</p>
           <textarea id="vision.idle_prompt" rows="8" style="min-height:10rem"></textarea>
         </div>
       </details>
@@ -1099,26 +1099,32 @@ function refreshGoalTokenWarn(){
 document.getElementById("system_prompt").addEventListener("input", refreshGoalTokenWarn);
 function applyGoal(goal){
   if (!goal) return;
-  const text = (goal.text || "").trim();
-  const n = goal.count ? `${(goal.index || 0) + 1} / ${goal.count}` : "";
+  const beatText = (goal.text || "").trim();
+  const campaign = (goal.campaign || "").trim();
+  const text = campaign && campaign !== beatText ? `${campaign} — ${beatText}` : (beatText || campaign);
+  const n = goal.count ? `campaign ${(goal.index || 0) + 1} / ${goal.count}` : "";
+  const beat = goal.beat_count > 1 ? `beat ${(goal.beat || 0) + 1} / ${goal.beat_count}` : "";
+  const hold = goal.hold > 1
+    ? `reply ${Math.min(goal.uses || 0, goal.hold - 1) + 1} / ${goal.hold}`
+    : "";
   const rem = goal.timer_on && goal.remaining_s != null
     ? `next in ${Math.max(0, Math.ceil(goal.remaining_s))}s`
     : "";
   const now = document.getElementById("goal_now");
   if (now) now.textContent = !goal.enabled ? "Goals off." : (text || "No goals in the list.");
   const meta = document.getElementById("goal_meta");
-  if (meta) meta.textContent = [n, rem].filter(Boolean).join(" · ");
+  if (meta) meta.textContent = [n, beat, hold, rem].filter(Boolean).join(" · ");
   const foot = document.getElementById("goal_now_footer");
   if (foot) foot.textContent = !goal.enabled ? "off" : (text || "none");
   const footRem = document.getElementById("goal_remaining_footer");
   if (footRem) {
-    const bits = [n, rem].filter(Boolean).join(" · ");
+    const bits = [n, beat, hold, rem].filter(Boolean).join(" · ");
     footRem.textContent = bits ? `(${bits})` : "";
   }
   const note = document.getElementById("goal_fold_note");
   if (note) {
-    const label = !goal.enabled ? "off" : (text || "none");
-    const bits = [n, rem].filter(Boolean).join(" · ");
+    const label = !goal.enabled ? "off" : (campaign || beatText || "none");
+    const bits = [n, beat, hold, rem].filter(Boolean).join(" · ");
     note.textContent = bits ? `${bits} · ${label}` : label;
   }
 }

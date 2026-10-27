@@ -33,8 +33,8 @@ Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inact
 |---------|------|--------|
 | `/ai/in/say` | string | inject visitor text (LLM+TTS) |
 | `/ai/in/speak` | string | TTS-only line |
-| `/ai/in/reset` | int | `1` clear history and advance the goal |
-| `/ai/in/goal` | int | `1` skip to the next goal, history stays (`0` ignored) |
+| `/ai/in/reset` | int | `1` clear history and advance the campaign |
+| `/ai/in/goal` | int | `1` skip to the next campaign, history stays (`0` ignored) |
 | `/ai/in/interrupt` | int | `1` abort turn |
 | `/ai/in/listen` | int | `1` unmute / `0` mute mic |
 | `/ai/in/vision` | int | `1` grab NDI still, caption, speak (external trigger only) |

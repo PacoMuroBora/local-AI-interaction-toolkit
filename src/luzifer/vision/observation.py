@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
+
+VISION_TOKEN = "{{vision}}"
+_BLANK_GAP = re.compile(r"\n{3,}")
 
 
 @dataclass
@@ -50,7 +54,7 @@ class ObservationStore:
         if max_age_s > 0 and obs.age > max_age_s:
             return ""
         return (
-            "\n\nWhat you currently see (private fact, not someone speaking). "
+            "What you currently see (private fact, not someone speaking). "
             "Yes-and one detail as a prop in the reply. Do not recite the note, "
             "do not mention the room, and do not add people or objects that are not in it:\n"
             f"{obs.text}"
@@ -58,3 +62,13 @@ class ObservationStore:
 
     def clear(self) -> None:
         self._latest = None
+
+
+def apply_vision_placeholder(prompt: str, block: str) -> tuple[str, bool]:
+    """Replace {{vision}}. Second value is whether the token was present."""
+    if VISION_TOKEN not in (prompt or ""):
+        return prompt, False
+    text = prompt.replace(VISION_TOKEN, (block or "").strip())
+    if not (block or "").strip():
+        text = _BLANK_GAP.sub("\n\n", text).strip()
+    return text, True

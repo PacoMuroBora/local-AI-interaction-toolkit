@@ -54,7 +54,7 @@ Header tabs:
 
 - **Audio In** — mic, VAD, Whisper size + download cache status  
 - **Audio Out** — TTS engine/voice, local monitor, Kokoro/Piper asset downloads  
-- **Prompt / LLM** — system prompt (`{{current_goal}}` is the active aim), goal list and switch timer, sampling, history turns, Ollama model list + pull  
+- **Prompt / LLM** — system prompt (`{{current_goal}}` is the active beat, `{{vision}}` is the latest caption), campaigns (`title | beat | beat`; a beat stays for two replies, the timer steps the campaign), sampling, history turns, Ollama model list + pull  
 - **Vision** — NDI source, external vs local-idle trigger, VLM model/prompt, inject-context  
 - **OSC** — out/in host and ports, plus the outbound and inbound message list  
 
@@ -93,7 +93,7 @@ Requires the [NDI runtime](https://ndi.video/) (same stack TD uses) plus `uv syn
 4. Or set **trigger = local_idle**. The backend samples the camera every `vision.interval_s` while it is listening and while a line is playing. Unchanged frames keep the current caption and do not call the vision model. A spoken aside waits until the room has been quiet for `vision.idle_after_s`, then respects `vision.speak_cooldown_s`. The vision model does not run during STT, thinking, or TTS synthesis.
 5. **Analyze** captions only; **Analyze + Comment** captions and speaks. Both force a grab and ignore the trigger toggle.
 
-Captions go to `/ai/vision_text` and the dashboard footer. With `vision.inject_context`, the next visitor turn gets the caption on the visitor system prompt (not history). Spoken asides use `vision.idle_prompt` instead of that prompt, and they do not see chat history. The chat model stays text-only — frames never enter `llm.model`.
+Captions go to `/ai/vision_text` and the dashboard footer. With `vision.inject_context`, the next visitor turn gets the caption where the system prompt contains `{{vision}}` (not history). Spoken asides use `vision.idle_prompt` instead of that prompt, and they do not see chat history. The chat model stays text-only — frames never enter `llm.model`.
 
 ### Whisper (`--extra stt`)
 
