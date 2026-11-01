@@ -24,8 +24,8 @@ For real models: `uv sync --extra all` (see [docs/SETUP.md](docs/SETUP.md)). Vis
 ```
 src/luzifer/          # config, pipeline, engines, dashboard, models
 runtime/output/       # speech.wav for TD Audio File In
-docs/                 # setup + OSC spec
-.cursor/rules/        # architecture, OSC gating, commit cadence
+docs/                 # setup, architecture, dashboard design, OSC spec
+.cursor/rules/        # conventions, where-to-look, OSC, dashboard, commits
 ```
 
 ## OSC

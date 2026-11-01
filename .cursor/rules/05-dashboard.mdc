@@ -1,0 +1,16 @@
+---
+description: Dashboard layout, tokens, and how to add controls
+globs: src/luzifer/dashboard.py
+alwaysApply: false
+---
+
+# Dashboard
+
+The UI is the `DASHBOARD_HTML` string in `src/luzifer/dashboard.py`. No extra CSS or JS files, no framework. Visual spec: `docs/DASHBOARD.md`.
+
+- Match the existing tokens: page `#0f1115`, panel `#161a22`, border `#2a2f3a`, text `#e8eaed`, muted `#9aa0a6`, accent `#1f6feb`. Buttons are primary, `.secondary`, or `.danger`. Danger is Reset only.
+- New setting: field on `AppSettings`, control `id` equal to the dotted path (`llm.num_gpu`), and that path added to `PATHS` unless collect/apply is already special-cased (goal list, device selects, some checkboxes).
+- New section: `details.fold` with a unique `data-fold` (saved in `localStorage` key `luzifer.folds`). New tab: `button.tab[data-tab]` plus `section#panel-{id}.panel`.
+- Forms live in tab panels. The footer is the live transcript and debug actions. The metrics strip is levels and GPU. State arrives on `/ws` — do not add a second live channel.
+- `.hint` only for timing, gating, or where a secret is stored. OSC tables in the OSC tab stay identical to `docs/OSC_SPEC.md`.
+- ElevenLabs key is `type="password"`. A blank save keeps the key in `runtime/secrets.yaml`.

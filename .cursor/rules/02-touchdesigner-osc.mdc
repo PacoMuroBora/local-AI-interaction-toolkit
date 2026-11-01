@@ -9,7 +9,7 @@ alwaysApply: true
 
 | Address | Type | Values |
 |---------|------|--------|
-| `/ai/state` | string | `listening`, `stt`, `thinking`, `synthesizing`, `speaking` (DAT only) |
+| `/ai/state` | string | `listening`, `stt`, `thinking`, `synthesizing`, `speaking`, `holding` (DAT only) |
 | `/ai/user_text` | string | visitor transcript |
 | `/ai/ai_text` | string | LLM reply |
 | `/ai/listening` | int | `1` / `0` |
@@ -24,6 +24,11 @@ alwaysApply: true
 | `/ai/vision_text` | string | latest NDI caption (DAT) |
 | `/ai/vision` | int | `1` then `0` on each new caption |
 | `/ai/vision_active` | int | `1` while the vision model call is in flight |
+| `/ai/engagement` | string | `idle`, `quiz`, `preach`, `spectacle` |
+| `/ai/engagement_phase` | string | `idle`, `ask`, `await`, `comment`, `story`, `reply`, `hold`, `line`, `vision` |
+| `/ai/engagement_card` | string | card id while a piece runs, else empty |
+| `/ai/show` | int | `1` only during a spectacle hold, else `0` |
+| `/ai/show_s` | float | hold seconds while show is on, else `0` |
 
 Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inactive channels are explicitly `0` — OSC In CHOP holds the last value.
 
@@ -33,13 +38,16 @@ Flag addresses are int `0`/`1` (never OSC bool). Send the full snapshot so inact
 |---------|------|--------|
 | `/ai/in/say` | string | inject visitor text (LLM+TTS) |
 | `/ai/in/speak` | string | TTS-only line |
-| `/ai/in/reset` | int | `1` clear history and advance the campaign |
+| `/ai/in/reset` | int | `1` clear history, end engagement, advance the campaign |
 | `/ai/in/goal` | int | `1` skip to the next campaign, history stays (`0` ignored) |
-| `/ai/in/interrupt` | int | `1` abort turn |
+| `/ai/in/interrupt` | int | `1` abort turn / engagement |
 | `/ai/in/listen` | int | `1` unmute / `0` mute mic |
 | `/ai/in/vision` | int | `1` grab NDI still, caption, speak (external trigger only) |
+| `/ai/in/quiz` | int | `1` fire next quiz card (`0` ignored) |
+| `/ai/in/preach` | int | `1` fire next preach card (`0` ignored) |
+| `/ai/in/spectacle` | int | `1` fire next spectacle score (`0` ignored) |
 
 - WAV path: `runtime/output/speech.wav` (reload on `/ai/play`).
-- Mic / VAD stream MUST stop whenever `state != "listening"` (covers `stt`, `thinking`, `synthesizing`, `speaking` anti-feedback).
+- Mic / VAD stream MUST stop whenever `state != "listening"` (covers `stt`, `thinking`, `synthesizing`, `speaking`, `holding` anti-feedback).
 - Do not invent new `/ai/*` addresses without updating `docs/OSC_SPEC.md` and the TD network.
 - Send OSC via `TouchDesignerOscClient`; receive via `TouchDesignerOscServer`. No raw socket one-offs in the pipeline.

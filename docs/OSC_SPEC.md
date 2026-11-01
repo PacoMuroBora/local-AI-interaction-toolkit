@@ -13,7 +13,7 @@ Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 
 | Address | Type | Example | TouchDesigner behavior |
 |---------|------|---------|------------------------|
-| `/ai/state` | string | `listening` | DAT only. Values: `loading`, `listening`, `stt`, `thinking`, `synthesizing`, `speaking`. `loading` is startup warmup; `/ai/listening` stays `0`. |
+| `/ai/state` | string | `listening` | DAT only. Values: `loading`, `listening`, `stt`, `thinking`, `synthesizing`, `speaking`, `holding`. `loading` is startup warmup; `/ai/listening` stays `0`. `holding` is a spectacle light gap (mic closed, no speech). Treat unknown states as not listening. |
 | `/ai/user_text` | string | `Who are you?` | DAT only. Visitor transcript. |
 | `/ai/ai_text` | string | `Here I am.` | DAT only. AI reply. |
 | `/ai/listening` | int | `1` or `0` | CHOP. `1` while the pipeline is in `listening`. |
@@ -28,6 +28,11 @@ Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 | `/ai/vision_text` | string | `A person stands…` | DAT. Latest NDI still caption from the vision VLM. |
 | `/ai/vision` | int | `1` then `0` | CHOP. Pulse on each new caption (rising edge). |
 | `/ai/vision_active` | int | `1` or `0` | CHOP. `1` while the vision VLM HTTP call is in flight. |
+| `/ai/engagement` | string | `quiz` | DAT. Active deck: `idle`, `quiz`, `preach`, `spectacle`. |
+| `/ai/engagement_phase` | string | `await` | DAT. Piece phase: `idle`, `ask`, `await`, `comment`, `story`, `reply`, `hold`, `line`, `vision`. |
+| `/ai/engagement_card` | string | `amazon-2024` | DAT. Card id while a piece runs; empty when idle. |
+| `/ai/show` | int | `1` or `0` | CHOP. `1` only during a spectacle hold (light cue). Else `0`. |
+| `/ai/show_s` | float | `7.0` | CHOP. Hold length in seconds while `/ai/show` is `1`; else `0`. Match the light cue to this value. |
 
 Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all six addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
 
@@ -125,11 +130,14 @@ Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message pe
 |---------|-----|--------------|
 | `/ai/in/say` | string | Visitor line. Skips mic/STT. Runs LLM + TTS + `/ai/play`. Appends chat history. |
 | `/ai/in/speak` | string | Say this line with TTS only. No LLM, no history. |
-| `/ai/in/reset` | int `1` | Clear chat history, empty transcript fields, and advance to the next campaign. |
+| `/ai/in/reset` | int `1` | Clear chat history, empty transcript fields, end any engagement piece, and advance to the next campaign. Deck cursors stay. |
 | `/ai/in/goal` | int `1` | Skip to the next campaign. The beat resets. Chat history stays. `0` is ignored. |
-| `/ai/in/interrupt` | int `1` | Abort think/speak, return to `listening`. |
+| `/ai/in/interrupt` | int `1` | Abort think/speak/engagement, return to `listening`. |
 | `/ai/in/listen` | int `1` or `0` | Unmute (`1`) or mute (`0`) the microphone. |
 | `/ai/in/vision` | int `1` | Grab NDI still, caption, speak a reaction. Only when `vision.enabled` and `vision.trigger=external`. TD should gate on idle + presence. |
+| `/ai/in/quiz` | int `1` | Fire the next quiz card (abort any active piece first). `0` ignored. |
+| `/ai/in/preach` | int `1` | Fire the next preach card. `0` ignored. |
+| `/ai/in/spectacle` | int `1` | Fire the next spectacle score. `0` ignored. |
 
 ### Example OSC Out DAT rows
 
@@ -141,6 +149,9 @@ Add an **OSC Out DAT**. Network Address `127.0.0.1`, Port `9001`. One message pe
 /ai/in/interrupt	1
 /ai/in/listen	0
 /ai/in/vision	1
+/ai/in/quiz	1
+/ai/in/preach	1
+/ai/in/spectacle	1
 ```
 
 Send with a CHOP Execute / DAT Execute that calls `op('oscout1').sendOSC(address, [arg])`, or pulse the OSC Out DAT send.

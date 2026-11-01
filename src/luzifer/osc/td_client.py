@@ -11,7 +11,9 @@ from typing import Literal
 from loguru import logger
 from pythonosc.udp_client import SimpleUDPClient
 
-StateName = Literal["loading", "listening", "stt", "thinking", "synthesizing", "speaking"]
+StateName = Literal[
+    "loading", "listening", "stt", "thinking", "synthesizing", "speaking", "holding"
+]
 
 ADDR_STATE = "/ai/state"
 ADDR_USER_TEXT = "/ai/user_text"
@@ -29,6 +31,11 @@ ADDR_OUT_LEVEL = "/ai/out_level"
 ADDR_VISION_TEXT = "/ai/vision_text"
 ADDR_VISION = "/ai/vision"
 ADDR_VISION_ACTIVE = "/ai/vision_active"
+ADDR_ENGAGEMENT = "/ai/engagement"
+ADDR_ENGAGEMENT_PHASE = "/ai/engagement_phase"
+ADDR_ENGAGEMENT_CARD = "/ai/engagement_card"
+ADDR_SHOW = "/ai/show"
+ADDR_SHOW_S = "/ai/show_s"
 
 OscArg = str | int | float
 
@@ -45,6 +52,8 @@ class TouchDesignerOscClient:
         self._lock = asyncio.Lock()
         self._flags: FlagSnapshot | None = None
         self._play = 0
+        self._engagement: tuple[str, str, str] | None = None
+        self._show: tuple[int, float] | None = None
 
     def reconfigure(self, host: str, port: int) -> None:
         if host == self._host and port == self._port:
@@ -136,3 +145,35 @@ class TouchDesignerOscClient:
 
     async def send_vision_active(self, active: bool) -> None:
         await self._send(ADDR_VISION_ACTIVE, 1 if active else 0)
+
+    async def send_engagement(
+        self,
+        mode: str,
+        phase: str,
+        card_id: str = "",
+    ) -> None:
+        """Mode / phase / card for TD. Deduped so idle spam stays quiet."""
+        snapshot = (str(mode or "idle"), str(phase or "idle"), str(card_id or ""))
+        if snapshot == self._engagement:
+            return
+        self._engagement = snapshot
+        await self._send_many(
+            (
+                (ADDR_ENGAGEMENT, snapshot[0]),
+                (ADDR_ENGAGEMENT_PHASE, snapshot[1]),
+                (ADDR_ENGAGEMENT_CARD, snapshot[2]),
+            )
+        )
+
+    async def send_show(self, active: bool, seconds: float = 0.0) -> None:
+        """Light-cue hold. ``show=1`` only during a spectacle hold; else ``0``."""
+        snapshot = (1 if active else 0, float(seconds) if active else 0.0)
+        if snapshot == self._show:
+            return
+        self._show = snapshot
+        await self._send_many(
+            (
+                (ADDR_SHOW, snapshot[0]),
+                (ADDR_SHOW_S, snapshot[1]),
+            )
+        )
