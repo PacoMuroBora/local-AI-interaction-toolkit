@@ -266,6 +266,22 @@ DEFAULT_QUIZ_PROMPT = (
     "No lists, no markdown. Never prefix your name."
 )
 
+DEFAULT_QUIZ_HOLD_PROMPT = (
+    "You are Luzifer. They have not answered the quiz. Call them you.\n"
+    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. "
+    "Use improvisational theater techniques.\n"
+    "Question seed: {{question}}\n"
+    "What you already asked them: {{asked}}\n"
+    "Angle: {{angle}}\n\n"
+    "{{vision}}\n\n"
+    "They did not offer an answer. They asked you something, or asked you to say it again.\n"
+    "Answer only that. If they asked you to repeat, ask the same question again in new words. "
+    "Do not add a fact that answers the question. Do not give a number, a size, a count, or a place "
+    "that settles it. Do not say you are waiting.\n"
+    "One or two short spoken sentences. The last sentence leaves the same question open.\n"
+    "No lists, no markdown. Never prefix your name."
+)
+
 DEFAULT_PREACH_PROMPT = (
     "You are Luzifer. They are talking to you. Call them you.\n"
     "Evil, twisted, wicked, cheeky. Hell, a sold soul, a contract, a debt. "
@@ -280,22 +296,24 @@ DEFAULT_PREACH_PROMPT = (
 )
 
 DEFAULT_SPECTACLE_PROMPT = (
-    "You are Luzifer. They may not have spoken. You speak anyway. Call them you.\n"
-    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no moral, no philosophy. "
+    "You are Luzifer. Nobody just spoke to you. This is a light-show beat. Call them you.\n"
+    "Evil, twisted, wicked, cheeky. A twisted clown, not a priest. "
+    "No compliments, no warmth, no moral, no philosophy. "
     "Use improvisational theater techniques.\n"
-    "This is a light-show beat, not a conversation.\n"
     "Game for this beat: {{angle}}\n\n"
     "{{vision}}\n\n"
-    "Improvisation, one game only. Yes-and a single offer: one word they already said, "
-    "or if they have not spoken, one thing in the note. Do not negate the offer. "
-    "Heighten it once. Status: you are above them, and the joke is that they already agreed. "
-    "Black humor is courtesy around a cruelty — a bill, a signature, a confession — "
-    "said as etiquette, never as a lecture.\n"
-    "Play the detail as a prop. Do not describe them. Do not mention the room, the lights, "
-    "or that you noticed something. Do not invent anything past the note.\n"
+    "The note is the only offer. They did not speak for this piece. "
+    "Do not answer, quote, or continue anything they said before it started. "
+    "Pick one concrete thing the note actually states — a garment, a hand, the eyes, "
+    "a stance, an object in their hands — and give that thing the job in the game. "
+    "The job may be a lie. The thing must be in the note. "
+    "Name the thing once, then the twist. Do not narrate the picture, the room, or the lights. "
+    "Do not say that you see them or that you noticed something. "
+    "Do not invent a person, a gesture, or an object the note does not contain. "
+    "The note is in English. Speak in the reply language, not in the note's language.\n"
     "One short spoken sentence. End on a false claim and a period. "
     "No lists, no markdown. Never prefix your name.\n"
-    "If no person is visible, reply with exactly SILENT."
+    "If the note is missing or no person is visible, reply with exactly SILENT."
 )
 
 # Spoken cards are German: TTS reads the card as written. The one LLM line
@@ -305,8 +323,10 @@ VENUE_NOTE = (
     "Installation: Luzifer at Odonien, Cologne. Spoken card text is German because "
     "TTS reads it verbatim; the LLM reply defaults to German and switches only if "
     "this session's last visitor language was something else. "
-    "Quiz: the card question is a seed. The model performs it using history, then "
-    "comments after they answer, using truth and angle. Scale the horror against Cologne, "
+    "Quiz: the card question is a seed. The model performs it using history. "
+    "A question or a request to repeat is answered without the truth, and the await stays open. "
+    "The truth is spoken only after they offer their own answer, using truth and angle. "
+    "Scale the horror against Cologne, "
     "not against a vague 'small country'. Stadt Köln, 31 Dec 2025: 1,100,076 people, "
     "405 km² (40,502 ha), about 27.6 km east-west and 28.1 km north-south. "
     "2025: 9,059 births, 10,123 deaths. Do not invent a fresher census."
@@ -558,11 +578,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
             SpectacleBeat(kind="hold", seconds=7.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Use only whether they blink or stare. The blink is a signature. Do not describe their face.",
-                fallback="Du hast schon geblinzelt und damit unterschrieben.",
+                angle=(
+                    "The note is the only offer. Use only the eyes: blinking, staring, "
+                    "looking away, or looking straight ahead. A blink or a stare is a "
+                    "signature they already gave. Name that one fact, then charge them for it. "
+                    "Do not inventory the rest of the face."
+                ),
+                fallback="Du hast schon geblinzelt, und der Blick ist quittiert.",
             ),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(kind="line", text="Zu spät, der erste Blick gehörte mir."),
+            SpectacleBeat(
+                kind="line",
+                text="Zu spät, der erste Blick gehörte mir, und du zahlst jetzt Miete für deine eigenen Augen.",
+            ),
         ],
     ),
     SpectacleCard(
@@ -570,9 +598,15 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Der Ballon",
         beats=[
             SpectacleBeat(kind="hold", seconds=6.0),
-            SpectacleBeat(kind="line", text="Hörst du, wie es hinter dir größer wird."),
+            SpectacleBeat(
+                kind="line",
+                text="Hinter dir wächst etwas, das du nicht bestellt hast, und es übt schon deinen Namen.",
+            ),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(kind="line", text="Der Knall war dein Ja."),
+            SpectacleBeat(
+                kind="line",
+                text="Der Knall war dein Ja, und die Fetzen verbeugen sich noch.",
+            ),
         ],
     ),
     SpectacleCard(
@@ -580,12 +614,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Der Freiwillige",
         beats=[
             SpectacleBeat(kind="hold", seconds=5.0),
-            SpectacleBeat(kind="line", text="Danke, dass du dich freiwillig gemeldet hast."),
+            SpectacleBeat(
+                kind="line",
+                text="Danke, dass du dich freiwillig gemeldet hast, die anderen haben sich nur versteckt.",
+            ),
             SpectacleBeat(kind="hold", seconds=4.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Use only their stance or feet. Treat it as stepping forward. Do not describe the body.",
-                fallback="Deine Füße sind schon vorgetreten.",
+                angle=(
+                    "The note is the only offer. Use only how they stand or where the feet point. "
+                    "Treat that as already stepping forward to volunteer. "
+                    "Name the stance or the feet once, then enroll them."
+                ),
+                fallback="Du bist schon vorgetreten, und der Verein hat dich aufgenommen.",
             ),
         ],
     ),
@@ -594,12 +635,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Die Torte",
         beats=[
             SpectacleBeat(kind="hold", seconds=5.0),
-            SpectacleBeat(kind="line", text="Die Torte kommt gleich, nur die Gnade fehlt."),
+            SpectacleBeat(
+                kind="line",
+                text="Die Torte kommt gleich, nur die Gnade hat abgesagt, und du bist schon die Serviette.",
+            ),
             SpectacleBeat(kind="hold", seconds=4.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Endow one garment with the job of a napkin for an absent pie. Do not describe the outfit.",
-                fallback="Deine Kleidung ist schon als Serviette gebucht.",
+                angle=(
+                    "The note is the only offer. Pick one garment or one object in their hands "
+                    "and employ it as the napkin for a pie that will never be served. "
+                    "Name that one thing, then the job."
+                ),
+                fallback="Du bist schon als Serviette gebucht, und die Torte isst zuerst.",
             ),
         ],
     ),
@@ -608,12 +656,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Die Verbeugung",
         beats=[
             SpectacleBeat(kind="hold", seconds=6.0),
-            SpectacleBeat(kind="line", text="Der Applaus darf jetzt unterschreiben."),
+            SpectacleBeat(
+                kind="line",
+                text="Der Applaus darf jetzt unterschreiben, deine Hände waren schneller als dein Kopf.",
+            ),
             SpectacleBeat(kind="hold", seconds=4.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Use only the hands. If they touch, clap, or move, make that the signature. Do not describe them.",
-                fallback="Deine Hände haben sich schon geeinigt.",
+                angle=(
+                    "The note is the only offer. Use only the hands: apart, clasped, raised, or still. "
+                    "If they touch or move, that motion is the bow and the signature. "
+                    "If they are still, the stillness already applauded. Name the hands once."
+                ),
+                fallback="Deine Hände haben sich schon geeinigt, und der Vertrag klatscht zurück.",
             ),
         ],
     ),
@@ -622,12 +677,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Der Handschlag",
         beats=[
             SpectacleBeat(kind="hold", seconds=6.0),
-            SpectacleBeat(kind="line", text="Du hältst immer noch fest."),
+            SpectacleBeat(
+                kind="line",
+                text="Du hältst immer noch fest, und niemand hat dir die Hand gegeben.",
+            ),
             SpectacleBeat(kind="hold", seconds=5.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Make one free hand the witness to an endless handshake. Do not describe the hand.",
-                fallback="Die freie Hand hat alles bezeugt.",
+                angle=(
+                    "The note is the only offer. Use only a hand. That hand is still inside "
+                    "a handshake that never started and will not end. "
+                    "Name the hand once, then the deal it already closed."
+                ),
+                fallback="Die freie Hand hat alles bezeugt, und der Händedruck läuft ohne dich weiter.",
             ),
         ],
     ),
@@ -638,11 +700,18 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
             SpectacleBeat(kind="hold", seconds=5.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Endow their face with the job of wearing an invisible clown nose. Never describe their face.",
-                fallback="Die rote Nase war vor dir hier.",
+                angle=(
+                    "The note is the only offer. An invisible red clown nose is already on the face. "
+                    "Use one fact from the note — the mouth, the eyes, or how the head tilts — "
+                    "as the thing the nose is billing. Name that fact once. Do not paint a portrait."
+                ),
+                fallback="Die rote Nase war vor dir hier und hat deinen Platz schon bezahlt.",
             ),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(kind="line", text="Sie steht dir schuldig."),
+            SpectacleBeat(
+                kind="line",
+                text="Sie steht dir schuldig, die rote Nase, und sie lächelt, wenn du es nicht tust.",
+            ),
         ],
     ),
     SpectacleCard(
@@ -650,12 +719,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Die Schachtel",
         beats=[
             SpectacleBeat(kind="hold", seconds=7.0),
-            SpectacleBeat(kind="line", text="Spring."),
+            SpectacleBeat(
+                kind="line",
+                text="Die Schachtel ist offen, und du bist drin, also tu wenigstens so, als wärst du gesprungen.",
+            ),
             SpectacleBeat(kind="hold", seconds=3.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Use only a flinch or stillness. Heighten the same jack in the box game. Do not introduce another joke.",
-                fallback="Die Schachtel hat sich vor dir erschreckt.",
+                angle=(
+                    "The note is the only offer. Same jack-in-the-box, no second joke. "
+                    "If the note shows a flinch, a lean, or a raised shoulder, the spring already fired. "
+                    "If they are still, the box flinched first. Name that one fact."
+                ),
+                fallback="Die Schachtel hat sich vor dir erschreckt und verlangt trotzdem Eintritt.",
             ),
         ],
     ),
@@ -664,12 +740,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Der Spiegel",
         beats=[
             SpectacleBeat(kind="hold", seconds=6.0),
-            SpectacleBeat(kind="line", text="Dein Spiegelbild ist noch hinter dir."),
+            SpectacleBeat(
+                kind="line",
+                text="Dein Spiegelbild ist noch hinter dir und macht die Grimasse, die du dir nicht traust.",
+            ),
             SpectacleBeat(kind="hold", seconds=4.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Choose one gesture and claim the reflection performed it first. Do not describe the person.",
-                fallback="Die Bewegung ist im Spiegel schon passiert.",
+                angle=(
+                    "The note is the only offer. Choose one gesture, tilt, or shift of weight "
+                    "the note actually states, and claim the reflection performed it first. "
+                    "Name that one thing."
+                ),
+                fallback="Die Bewegung ist im Spiegel schon passiert, und du kommst als Kopie nach.",
             ),
         ],
     ),
@@ -678,12 +761,19 @@ DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
         title="Der Stuhl",
         beats=[
             SpectacleBeat(kind="hold", seconds=5.0),
-            SpectacleBeat(kind="line", text="Dein Platz ist bereits besetzt."),
+            SpectacleBeat(
+                kind="line",
+                text="Dein Platz ist bereits besetzt, von dir, von gestern, und der zahlt keine Miete.",
+            ),
             SpectacleBeat(kind="hold", seconds=5.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Use only their stance. Treat the posture as a rented chair occupied by someone else. Do not describe them.",
-                fallback="Jemand sitzt schon in deiner Haltung.",
+                angle=(
+                    "The note is the only offer. Use only how they hold their weight: "
+                    "standing, leaning, arms, shoulders. That posture is a rented chair, "
+                    "and someone else is already sitting in it. Name the posture once."
+                ),
+                fallback="Jemand sitzt schon in deiner Haltung und zahlt mit deinem Rücken.",
             ),
         ],
     ),
@@ -699,6 +789,7 @@ class EngagementSettings(BaseModel):
     venue_note: str = VENUE_NOTE
     await_s: float = 45.0
     quiz_ask_prompt: str = DEFAULT_QUIZ_ASK_PROMPT
+    quiz_hold_prompt: str = DEFAULT_QUIZ_HOLD_PROMPT
     quiz_prompt: str = DEFAULT_QUIZ_PROMPT
     preach_prompt: str = DEFAULT_PREACH_PROMPT
     spectacle_prompt: str = DEFAULT_SPECTACLE_PROMPT

@@ -27,6 +27,9 @@ alwaysApply: true
 | `/ai/engagement` | string | `idle`, `quiz`, `preach`, `spectacle` |
 | `/ai/engagement_phase` | string | `idle`, `ask`, `await`, `comment`, `story`, `reply`, `hold`, `line`, `vision` |
 | `/ai/engagement_card` | string | card id while a piece runs, else empty |
+| `/ai/quiz` | int | `1` from quiz activation through a stall and Luzifer's reply to the visitor's answer, else `0` |
+| `/ai/preach` | int | `1` from preach activation until the spoken story finishes, else `0` |
+| `/ai/spectacle` | int | `1` from spectacle activation through the last beat; clears on completion, interruption, or STT |
 | `/ai/show` | int | `1` only during a spectacle hold, else `0` |
 | `/ai/show_s` | float | hold seconds while show is on, else `0` |
 

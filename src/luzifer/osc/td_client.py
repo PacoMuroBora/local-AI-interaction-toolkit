@@ -34,6 +34,9 @@ ADDR_VISION_ACTIVE = "/ai/vision_active"
 ADDR_ENGAGEMENT = "/ai/engagement"
 ADDR_ENGAGEMENT_PHASE = "/ai/engagement_phase"
 ADDR_ENGAGEMENT_CARD = "/ai/engagement_card"
+ADDR_QUIZ = "/ai/quiz"
+ADDR_PREACH = "/ai/preach"
+ADDR_SPECTACLE = "/ai/spectacle"
 ADDR_SHOW = "/ai/show"
 ADDR_SHOW_S = "/ai/show_s"
 
@@ -52,7 +55,7 @@ class TouchDesignerOscClient:
         self._lock = asyncio.Lock()
         self._flags: FlagSnapshot | None = None
         self._play = 0
-        self._engagement: tuple[str, str, str] | None = None
+        self._engagement: tuple[str, str, str, int, int, int] | None = None
         self._show: tuple[int, float] | None = None
 
     def reconfigure(self, host: str, port: int) -> None:
@@ -151,9 +154,20 @@ class TouchDesignerOscClient:
         mode: str,
         phase: str,
         card_id: str = "",
+        *,
+        quiz: bool = False,
+        preach: bool = False,
+        spectacle: bool = False,
     ) -> None:
-        """Mode / phase / card for TD. Deduped so idle spam stays quiet."""
-        snapshot = (str(mode or "idle"), str(phase or "idle"), str(card_id or ""))
+        """Mode metadata plus full 0/1 deck snapshot. Deduped while unchanged."""
+        snapshot = (
+            str(mode or "idle"),
+            str(phase or "idle"),
+            str(card_id or ""),
+            1 if quiz else 0,
+            1 if preach else 0,
+            1 if spectacle else 0,
+        )
         if snapshot == self._engagement:
             return
         self._engagement = snapshot
@@ -162,6 +176,9 @@ class TouchDesignerOscClient:
                 (ADDR_ENGAGEMENT, snapshot[0]),
                 (ADDR_ENGAGEMENT_PHASE, snapshot[1]),
                 (ADDR_ENGAGEMENT_CARD, snapshot[2]),
+                (ADDR_QUIZ, snapshot[3]),
+                (ADDR_PREACH, snapshot[4]),
+                (ADDR_SPECTACLE, snapshot[5]),
             )
         )
 

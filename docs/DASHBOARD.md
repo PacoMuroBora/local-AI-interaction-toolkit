@@ -13,7 +13,7 @@ Top to bottom, full viewport (`body` is a column, `main` is `flex: 1`):
 3. **One panel** — the active tab. Panels are a vertical stack of folds, not a card grid.
 4. **Footer** — warmup bar (hidden once warmup finishes), live transcript, activity flags, direct-playback switch, debug actions. Stays visible on every tab.
 
-Tabs: `floor`, `audio-in`, `audio-out`, `prompt-llm`, `vision`, `osc`. Markup is `button.tab[data-tab="{id}"]` and `section#panel-{id}.panel`. Floor is first and carries `active` — fire quiz / preach / spectacle, edit decks, see the live phase and last overlay prompt. A quiz card stores a question seed; the LLM performs the spoken intro with session history before waiting for the answer. The footer engagement strip mirrors mode / phase / card / show on every tab.
+Tabs: `floor`, `audio-in`, `audio-out`, `prompt-llm`, `vision`, `osc`. Markup is `button.tab[data-tab="{id}"]` and `section#panel-{id}.panel`. Floor is first and carries `active` — fire quiz / preach / spectacle, edit decks, see the live phase and last overlay prompt. A quiz card stores a question seed; the LLM performs the spoken intro, answers a repeat or a side question without the truth, and roasts with the truth only after the visitor offers a guess. The footer engagement strip mirrors mode / phase / card / show on every tab.
 
 ## Tokens
 

@@ -56,7 +56,7 @@ def render_engagement_prompt(template: str, values: dict[str, str]) -> str:
     for key, value in values.items():
         out = out.replace("{{" + key + "}}", value or "")
     # Strip leftover known tokens so a blank vision does not leave braces.
-    for key in ("question", "truth", "angle", "vision", "title", "hook"):
+    for key in ("question", "truth", "angle", "vision", "title", "hook", "asked"):
         out = out.replace("{{" + key + "}}", "")
     return re.sub(r"\n{3,}", "\n\n", out).strip()
 

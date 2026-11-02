@@ -295,6 +295,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <label>Quiz intro prompt</label>
                 <textarea id="eng_quiz_ask_prompt" rows="12" style="min-height:14rem"></textarea>
               </div>
+              <div id="floor-quiz-hold-prompt">
+                <label>Quiz stall prompt</label>
+                <textarea id="eng_quiz_hold_prompt" rows="10" style="min-height:10rem"></textarea>
+              </div>
               <label id="eng_overlay_prompt_label">Reply prompt</label>
               <p class="hint" id="floor_prompt_hint">Used for the one LLM reply after they answer. Placeholders: {{question}} {{truth}} {{angle}} {{vision}}</p>
               <textarea id="eng_overlay_prompt" rows="12" style="min-height:14rem"></textarea>
@@ -637,6 +641,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               <tr><td><code>/ai/engagement</code></td><td class="typ">string</td><td>DAT. <code>idle</code>, <code>quiz</code>, <code>preach</code>, <code>spectacle</code>.</td></tr>
               <tr><td><code>/ai/engagement_phase</code></td><td class="typ">string</td><td>DAT. Piece phase (<code>ask</code>, <code>await</code>, <code>hold</code>, …).</td></tr>
               <tr><td><code>/ai/engagement_card</code></td><td class="typ">string</td><td>DAT. Card id while a piece runs.</td></tr>
+              <tr><td><code>/ai/quiz</code></td><td class="typ">int</td><td>CHOP. <code>1</code> from the ask through a stall (repeat, side question) and Luzifer's reply to the real answer. Drops on that reply, interruption, or timeout.</td></tr>
+              <tr><td><code>/ai/preach</code></td><td class="typ">int</td><td>CHOP. <code>1</code> until the spoken story finishes.</td></tr>
+              <tr><td><code>/ai/spectacle</code></td><td class="typ">int</td><td>CHOP. <code>1</code> through the last beat; clears on completion, interruption, or STT.</td></tr>
               <tr><td><code>/ai/show</code></td><td class="typ">int</td><td>CHOP. <code>1</code> during a spectacle hold (light cue).</td></tr>
               <tr><td><code>/ai/show_s</code></td><td class="typ">float</td><td>CHOP. Hold seconds while show is on; else <code>0</code>.</td></tr>
               <tr><td><code>/ai/in_level</code></td><td class="typ">float</td><td>CHOP. Mic peak, 0–1, 30 Hz. Drops to <code>0</code> shortly after the mic closes.</td></tr>
@@ -1082,6 +1089,7 @@ function defaultEngagement(){
   return {
     await_s: 45,
     quiz_ask_prompt: "",
+    quiz_hold_prompt: "",
     quiz_prompt: "",
     preach_prompt: "",
     spectacle_prompt: "",
@@ -1130,6 +1138,7 @@ function pullCardFieldsIntoDraft(){
   }
   if (floorMode === "quiz") {
     engagementDraft.quiz_ask_prompt = document.getElementById("eng_quiz_ask_prompt").value;
+    engagementDraft.quiz_hold_prompt = document.getElementById("eng_quiz_hold_prompt").value;
   }
   const promptKey = floorMode + "_prompt";
   engagementDraft[promptKey] = document.getElementById("eng_overlay_prompt").value;
@@ -1207,11 +1216,13 @@ function pushCardFieldsFromDraft(){
   document.getElementById("floor-preach-fields").hidden = floorMode !== "preach";
   document.getElementById("floor-spectacle-fields").hidden = floorMode !== "spectacle";
   document.getElementById("floor-quiz-ask-prompt").hidden = floorMode !== "quiz";
+  document.getElementById("floor-quiz-hold-prompt").hidden = floorMode !== "quiz";
   document.getElementById("eng_quiz_ask_prompt").value = engagementDraft.quiz_ask_prompt || "";
+  document.getElementById("eng_quiz_hold_prompt").value = engagementDraft.quiz_hold_prompt || "";
   document.getElementById("eng_overlay_prompt_label").textContent =
     floorMode === "quiz" ? "Answer roast prompt" : "Reply prompt";
   const hints = {
-    quiz: "Intro placeholders: {{question}} {{angle}} {{vision}}. Roast placeholders: {{question}} {{truth}} {{angle}} {{vision}}",
+    quiz: "Stall placeholders: {{question}} {{asked}} {{angle}} {{vision}}. Roast placeholders: {{question}} {{truth}} {{angle}} {{vision}}. The truth is not in the stall prompt.",
     preach: "Used for the one reply after they answer. Placeholders: {{title}} {{hook}} {{vision}}",
     spectacle: "Used for each vision beat. Placeholders: {{angle}} {{vision}}",
   };
@@ -1515,7 +1526,7 @@ document.getElementById("eng_beat_add").onclick = () => {
 };
 ["eng_quiz_id","eng_quiz_question","eng_quiz_truth","eng_quiz_angle",
  "eng_preach_id","eng_preach_title","eng_preach_text",
- "eng_spec_id","eng_spec_title","eng_quiz_ask_prompt","eng_overlay_prompt","engagement.await_s"
+ "eng_spec_id","eng_spec_title","eng_quiz_ask_prompt","eng_quiz_hold_prompt","eng_overlay_prompt","engagement.await_s"
 ].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("input", markEngDirty);

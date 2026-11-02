@@ -132,6 +132,22 @@ def _vision_reply_silent(text: str) -> bool:
     return not is_usable_caption(stripped)
 
 
+_QUIZ_GATE_PROMPT = (
+    "You sort one visitor line during a quiz. Judge only their latest line.\n"
+    "ANSWER if they offered a guess: a number, a place, a yes, a no, or that they do not know.\n"
+    "HOLD if they asked you to repeat, asked where or what you mean, asked a question back, "
+    "or have not offered their own answer yet.\n"
+    "Reply with exactly one word: ANSWER or HOLD."
+)
+
+
+def quiz_gate_is_answer(raw: str) -> bool:
+    """True only when the gate's first word is ANSWER. Anything else stays in the quiz."""
+    parts = (raw or "").strip().split(None, 1)
+    word = parts[0].strip(".,!?:;\"'*").upper() if parts else ""
+    return word == "ANSWER"
+
+
 def idle_system_prompt(vision: VisionSettings, lang: str | None) -> str:
     """Camera aside. The visitor system prompt is not included."""
     text = (vision.idle_prompt or "").strip() or DEFAULT_IDLE_PROMPT
@@ -233,7 +249,14 @@ class Pipeline:
 
     async def _publish_engagement_osc(self) -> None:
         eng = self.engagement
-        await self.osc.send_engagement(eng.mode, eng.phase, eng.card_id)
+        await self.osc.send_engagement(
+            eng.mode,
+            eng.phase,
+            eng.card_id,
+            quiz=eng.mode == "quiz",
+            preach=eng.mode == "preach" and eng.phase == "story",
+            spectacle=eng.mode == "spectacle" and self.state != "stt",
+        )
         await self.osc.send_show(eng.show, eng.show_s if eng.show else 0.0)
 
     def engagement_status(self) -> dict[str, Any]:
@@ -501,6 +524,24 @@ class Pipeline:
         self.last_language = code
         logger.info("turn language={} source={}", code, source)
 
+    def _language_from_recent_history(self) -> str | None:
+        """Visitor language for a beat that must not see the chat.
+
+        Latest user line that guesses wins. Assistant lines are skipped: spectacle
+        cards are authored German and are not the visitor's language. STT language
+        remains the fallback when the text has no markers.
+        """
+        for message in reversed(self._history):
+            if str(message.get("role") or "") != "user":
+                continue
+            content = str(message.get("content") or "").strip()
+            if not content or content.startswith("[in front of you]"):
+                continue
+            guessed = guess_lang_from_text(content)
+            if guessed:
+                return guessed
+        return self.last_language
+
     async def _wait_or_interrupt(self, seconds: float) -> bool:
         """Sleep up to seconds; return True if interrupt won."""
         if seconds <= 0:
@@ -709,6 +750,14 @@ class Pipeline:
                 )
                 await self.osc.send_levels(0.0, 0.0)
                 await self.osc.send_vision_active(False)
+                await self.osc.send_engagement(
+                    "idle",
+                    "idle",
+                    "",
+                    quiz=False,
+                    preach=False,
+                    spectacle=False,
+                )
                 await self.osc.clear_play(force=True)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("OSC shutdown clear failed: {}", exc)
@@ -1075,9 +1124,8 @@ class Pipeline:
         await self._notify()
         beats = list(getattr(card, "beats", None) or [])
         settings = await self.store.get()
-        spectacle_history = (
-            list(self._history) if settings.llm.history_turns > 0 else []
-        )
+        spoken_lines: list[str] = []
+        piece_title = str(getattr(card, "title", "") or "").strip()
         vision_task: asyncio.Task[str | None] | None = None
         try:
             for index, beat in enumerate(beats):
@@ -1118,16 +1166,15 @@ class Pipeline:
                         continue
                     self.engagement.set_phase("line")
                     await self._notify()
-                    guessed = guess_lang_from_text(text)
-                    if guessed:
-                        self._set_turn_language(guessed, source="text")
                     self.last_ai_text = text
                     await self.osc.send_ai_text(text)
                     await self._notify()
-                    await self._speak_text(text)
+                    # Card copy is authored. Do not let it replace the visitor language.
+                    await self._speak_text(text, lang=guess_lang_from_text(text) or "de")
                     if self._interrupt.is_set():
                         return
                     self._append_assistant_history(text)
+                    spoken_lines.append(text)
                     continue
                 if kind == "vision":
                     self.engagement.set_phase("vision")
@@ -1149,7 +1196,8 @@ class Pipeline:
                         beat,
                         settings,
                         caption=caption,
-                        history=spectacle_history,
+                        spoken_lines=spoken_lines,
+                        piece_title=piece_title,
                     )
                     continue
         finally:
@@ -1170,56 +1218,81 @@ class Pipeline:
         settings: Any,
         *,
         caption: str,
-        history: list[ChatMessage],
+        spoken_lines: list[str],
+        piece_title: str,
     ) -> None:
+        """Speak one look. Session chat is not in this call — the caption is the offer."""
         angle = str(getattr(beat, "angle", "") or "").strip()
         fallback = str(getattr(beat, "fallback", "") or "").strip()
-        vision_block = ""
-        if caption:
+        caption_body = caption.strip()
+        usable = bool(caption_body) and not caption_sees_no_person(caption_body)
+        reply_lang = self._language_from_recent_history()
+        reply_code = normalize_lang(reply_lang) or "de"
+        reply_name = _LANG_NAMES.get(reply_code, reply_code)
+        spoken = ""
+        if usable:
             vision_block = (
                 "What you currently see (private fact, not someone speaking). "
-                f"{caption}"
+                f"{caption_body}"
             )
-        template = settings.engagement.spectacle_prompt
-        system = render_engagement_prompt(
-            template,
-            {"angle": angle, "vision": vision_block},
-        )
-        system = insert_before_goal(system, language_system_suffix(self.last_language)).strip()
-        self.engagement.last_rendered_prompt = system
-        await self._notify()
-
-        prior = (self.last_user_text or "").strip()
-        user = (
-            "[spectacle beat — yes-and]\n"
-            f"What you see: {caption.strip() or '(no caption)'}\n"
-            f"Their last words this session, if any: {prior or '(they have not spoken)'}\n\n"
-            "Accept one offer only. Either one word they said, or one thing in the note. "
-            "Heighten that. One short spoken sentence."
-        )
-        await self.set_state("thinking")
-        try:
-            ai_text = await self.llm.chat(user, system, settings.llm, history=history)
-        except asyncio.CancelledError:
-            await self.set_state("listening")
-            raise
-        if self._interrupt.is_set():
-            return
-        stripped = (ai_text or "").strip()
-        if _vision_reply_silent(stripped):
-            if fallback:
-                stripped = fallback
-            else:
-                logger.info("Spectacle vision beat silent, skipping")
+            template = settings.engagement.spectacle_prompt
+            system = render_engagement_prompt(
+                template,
+                {"angle": angle, "vision": vision_block},
+            )
+            system = insert_before_goal(system, language_system_suffix(reply_lang)).strip()
+            self.engagement.last_rendered_prompt = system
+            await self._notify()
+            prior_lines = "\n".join(f"- {line}" for line in spoken_lines) or "(nothing yet)"
+            title = piece_title or "(untitled)"
+            user = (
+                "[spectacle beat — look only]\n"
+                f"Piece: {title}\n"
+                "They have not spoken since this piece started. "
+                "Do not answer or continue anything they said before it.\n\n"
+                f"What you see right now:\n{caption_body}\n\n"
+                f"Lines you already spoke in this piece (do not copy their language):\n{prior_lines}\n\n"
+                "Use one concrete thing from the look. Give it the job in the game. "
+                "One short spoken sentence.\n"
+                f"Reply in {reply_name} only. The look is an English note, not your language."
+            )
+            logger.info(
+                "Spectacle vision beat lang={} caption: {}",
+                reply_code,
+                caption_body[:120],
+            )
+            await self.set_state("thinking")
+            try:
+                ai_text = await self.llm.chat(user, system, settings.llm, history=[])
+            except asyncio.CancelledError:
                 await self.set_state("listening")
+                raise
+            if self._interrupt.is_set():
                 return
-        self.last_ai_text = stripped
-        await self.osc.send_ai_text(stripped)
+            spoken = (ai_text or "").strip()
+            if _vision_reply_silent(spoken):
+                logger.info("Spectacle vision model declined; using fallback")
+                spoken = fallback
+        else:
+            logger.info(
+                "Spectacle vision beat has nothing to play ({})",
+                "no person" if caption_body else "empty caption",
+            )
+            spoken = fallback
+        if not spoken:
+            logger.info("Spectacle vision beat silent, skipping")
+            return
+        self.last_ai_text = spoken
+        await self.osc.send_ai_text(spoken)
         await self._notify()
-        await self._speak_text(stripped)
+        speak_lang = reply_code
+        if spoken == fallback:
+            speak_lang = guess_lang_from_text(spoken) or "de"
+        await self._speak_text(spoken, lang=speak_lang)
         if self._interrupt.is_set():
             return
-        self._append_assistant_history(stripped)
+        self._append_assistant_history(spoken)
+        spoken_lines.append(spoken)
 
     async def _run_engagement_reply(self, user_text: str) -> None:
         """One overlay LLM turn after quiz/preach await, then snap back."""
@@ -1231,6 +1304,25 @@ class Pipeline:
             if card is None:
                 await self._end_engagement(reason="missing_card")
                 await self.set_state("listening")
+                return
+            await self.set_state("thinking")
+            try:
+                offered = await self._quiz_visitor_offered_answer(
+                    user_text,
+                    question=str(card.question or ""),
+                    asked=self.last_ai_text,
+                    settings=settings,
+                )
+            except asyncio.CancelledError:
+                await self._end_engagement(reason="cancel")
+                await self.set_state("listening")
+                raise
+            if self._interrupt.is_set():
+                await self._end_engagement(reason="interrupt")
+                await self.set_state("listening")
+                return
+            if not offered:
+                await self._run_quiz_hold(user_text, card, settings, vision_block)
                 return
             self.engagement.set_phase("comment")
             await self._notify()
@@ -1290,13 +1382,81 @@ class Pipeline:
         await self._end_engagement(reason="reply_done")
         await self._notify()
 
-    async def _speak_text(self, text: str) -> None:
+    async def _quiz_visitor_offered_answer(
+        self,
+        user_text: str,
+        *,
+        question: str,
+        asked: str,
+        settings: Any,
+    ) -> bool:
+        """True when this line is their guess. The truth is not in this call."""
+        asked_line = (asked or "").strip() or question
+        user = (
+            f"Question you asked:\n{asked_line}\n\n"
+            f"Their latest line:\n{user_text}\n\n"
+            "ANSWER or HOLD."
+        )
+        raw = await self.llm.chat(user, _QUIZ_GATE_PROMPT, settings.llm, history=[])
+        offered = quiz_gate_is_answer(raw)
+        logger.info("Quiz gate {} → {}", "answer" if offered else "hold", (raw or "")[:80])
+        return offered
+
+    async def _run_quiz_hold(
+        self,
+        user_text: str,
+        card: Any,
+        settings: Any,
+        vision_block: str,
+    ) -> None:
+        """Clarify or repeat. The truth stays out, and the quiz keeps waiting."""
+        self.engagement.set_phase("ask")
+        await self._notify()
+        system = render_engagement_prompt(
+            settings.engagement.quiz_hold_prompt,
+            {
+                "question": str(card.question or ""),
+                "asked": self.last_ai_text,
+                "angle": str(card.angle or ""),
+                "vision": vision_block,
+            },
+        )
+        system = insert_before_goal(system, language_system_suffix(self.last_language)).strip()
+        self.engagement.last_rendered_prompt = system
+        history = list(self._history) if settings.llm.history_turns > 0 else []
+        await self.set_state("thinking")
+        try:
+            ai_text = await self.llm.chat(user_text, system, settings.llm, history=history)
+        except asyncio.CancelledError:
+            await self._end_engagement(reason="cancel")
+            await self.set_state("listening")
+            raise
+        if self._interrupt.is_set():
+            await self._end_engagement(reason="interrupt")
+            await self.set_state("listening")
+            return
+        self.last_ai_text = ai_text
+        await self.osc.send_ai_text(ai_text)
+        await self._notify()
+        if settings.llm.history_turns > 0:
+            self._history.append({"role": "user", "content": user_text})
+            self._history.append({"role": "assistant", "content": ai_text})
+            self._trim_history(settings.llm.history_turns)
+        await self._speak_text(ai_text)
+        if self._interrupt.is_set():
+            await self._end_engagement(reason="interrupt")
+            await self.set_state("listening")
+            return
+        self.engagement.arm_await(settings.engagement.await_s)
+        await self._notify()
+
+    async def _speak_text(self, text: str, *, lang: str | None = None) -> None:
         if self._interrupt.is_set():
             await self.set_state("listening")
             return
 
         settings = await self.store.get()
-        tts = resolve_tts_for_lang(settings.tts, self.last_language)
+        tts = resolve_tts_for_lang(settings.tts, self.last_language if lang is None else lang)
         await self.set_state("synthesizing")
         out_path = settings.resolve_output_path()
         try:

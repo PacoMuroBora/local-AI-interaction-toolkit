@@ -31,10 +31,13 @@ Wire an **OSC In DAT** (or OSC In CHOP) to port `9000`.
 | `/ai/engagement` | string | `quiz` | DAT. Active deck: `idle`, `quiz`, `preach`, `spectacle`. |
 | `/ai/engagement_phase` | string | `await` | DAT. Piece phase: `idle`, `ask`, `await`, `comment`, `story`, `reply`, `hold`, `line`, `vision`. |
 | `/ai/engagement_card` | string | `amazon-2024` | DAT. Card id while a piece runs; empty when idle. |
+| `/ai/quiz` | int | `1` or `0` | CHOP. `1` from quiz activation through a stall (repeat, side question) and Luzifer's reply to the visitor's answer. Drops on that reply, interruption, or timeout. |
+| `/ai/preach` | int | `1` or `0` | CHOP. `1` from preach activation until the spoken story finishes. The later await/reply does not keep it high. |
+| `/ai/spectacle` | int | `1` or `0` | CHOP. `1` from spectacle activation through the last beat. Drops at completion, interruption, or STT. |
 | `/ai/show` | int | `1` or `0` | CHOP. `1` only during a spectacle hold (light cue). Else `0`. |
 | `/ai/show_s` | float | `7.0` | CHOP. Hold length in seconds while `/ai/show` is `1`; else `0`. Match the light cue to this value. |
 
-Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every flag snapshot sends all six addresses, so an inactive flag is explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
+Ints are `0`/`1`, not OSC bool. A bool has no payload and OSC In CHOP often never makes a channel. Every state snapshot sends all six state flags, and every engagement snapshot sends all three mode flags, so inactive channels are explicitly `0`. OSC In CHOP sample-and-holds: if you only ever send `1`, the channel stays `1`.
 
 `listening` and `user_speaking` can both be `1`. `stt` / `thinking` / `synthesizing` / `ai_speaking` are exclusive. Idle with the mic armed is `listening=1` and the other flags `0`. Clean shutdown sends every flag `0` and `play=0`. A hard kill cannot send that; the CHOP keeps the last numbers.
 
@@ -60,6 +63,9 @@ Port `9000`. Strings never become channels; that's why the CHOP in the screensho
 - `ai/thinking`
 - `ai/synthesizing`
 - `ai/ai_speaking`
+- `ai/quiz`
+- `ai/preach`
+- `ai/spectacle`
 - `ai/play`
 - `ai/in_level`
 - `ai/out_level`
@@ -71,8 +77,8 @@ op('oscin1')['ai/thinking']
 Rename CHOP, from → to:
 
 ```
-ai/listening ai/user_speaking ai/stt ai/thinking ai/synthesizing ai/ai_speaking ai/play
-listening user stt thinking synth speaking play
+ai/listening ai/user_speaking ai/stt ai/thinking ai/synthesizing ai/ai_speaking ai/quiz ai/preach ai/spectacle ai/play
+listening user stt thinking synth speaking quiz preach spectacle play
 ```
 
 Export the bool channels straight onto blends.
