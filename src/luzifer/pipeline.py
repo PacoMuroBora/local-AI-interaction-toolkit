@@ -20,6 +20,7 @@ from luzifer.llm.ollama import ChatMessage, OllamaEngine, models_match
 from luzifer.metrics import LEVEL_HZ, MetricsStore
 from luzifer.osc.td_client import TouchDesignerOscClient
 from luzifer.stt.whisper import WhisperEngine
+from luzifer.speechtext import numbers_as_words
 from luzifer.tts.kokoro import TtsEngine
 from luzifer.vision.frames import frame_changed, jpeg_bytes, mean_abs_diff
 from luzifer.vision.ndi import NdiGrabber
@@ -43,6 +44,8 @@ _EN_HINT = re.compile(
     r"\b(the|and|you|what|is|are|this|that|with|have|why|how|hello|please)\b",
     re.IGNORECASE,
 )
+# Mic stays shut this long after a preach story so the tail is not transcribed.
+_PREACH_STT_DELAY_S = 3.0
 
 
 def guess_lang_from_text(text: str) -> str | None:
@@ -1086,6 +1089,7 @@ class Pipeline:
         spoken_question = (generated or "").strip()
         if not spoken_question or spoken_question.strip(" .!?").upper() == "SILENT":
             spoken_question = question
+        spoken_question = numbers_as_words(spoken_question, self.last_language)
         self.last_ai_text = spoken_question
         await self.osc.send_ai_text(spoken_question)
         await self._notify()
@@ -1111,10 +1115,15 @@ class Pipeline:
         self.last_ai_text = script
         await self.osc.send_ai_text(script)
         await self._notify()
-        await self._speak_text(script)
+        await self._speak_text(script, then_listen=False)
         if self._interrupt.is_set():
             return
         self._append_assistant_history(script)
+        self.engagement.set_phase("await")
+        await self._notify()
+        logger.info("Preach {:.0f}s before STT", _PREACH_STT_DELAY_S)
+        if await self._wait_or_interrupt(_PREACH_STT_DELAY_S):
+            return
         self.engagement.arm_await(self.store.settings.engagement.await_s)
         await self._notify()
         await self.set_state("listening")
@@ -1371,6 +1380,8 @@ class Pipeline:
             await self.set_state("listening")
             return
 
+        if mode == "quiz":
+            ai_text = numbers_as_words(ai_text, self.last_language)
         self.last_ai_text = ai_text
         await self.osc.send_ai_text(ai_text)
         await self._notify()
@@ -1435,6 +1446,7 @@ class Pipeline:
             await self._end_engagement(reason="interrupt")
             await self.set_state("listening")
             return
+        ai_text = numbers_as_words(ai_text, self.last_language)
         self.last_ai_text = ai_text
         await self.osc.send_ai_text(ai_text)
         await self._notify()
@@ -1450,7 +1462,7 @@ class Pipeline:
         self.engagement.arm_await(settings.engagement.await_s)
         await self._notify()
 
-    async def _speak_text(self, text: str, *, lang: str | None = None) -> None:
+    async def _speak_text(self, text: str, *, lang: str | None = None, then_listen: bool = True) -> None:
         if self._interrupt.is_set():
             await self.set_state("listening")
             return
@@ -1513,7 +1525,8 @@ class Pipeline:
                 raise
 
         self._last_activity_at = time.monotonic()
-        await self.set_state("listening")
+        # holding: mic closed, /ai/play already cleared, /ai/show stays 0.
+        await self.set_state("listening" if then_listen else "holding")
 
     def _vision_sample_allowed(self) -> bool:
         """True when a new VLM call will not sit on the talker's Ollama lock.

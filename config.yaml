@@ -42,10 +42,9 @@ engagement:
     is a seed. The model performs it using history. A question or a request to repeat
     is answered without the truth, and the await stays open. The truth is spoken only
     after they offer their own answer, using truth and angle. Scale the horror against
-    Cologne, not against a vague ''small
-    country''. Stadt Köln, 31 Dec 2025: 1,100,076 people, 405 km² (40,502 ha), about
-    27.6 km east-west and 28.1 km north-south. 2025: 9,059 births, 10,123 deaths.
-    Do not invent a fresher census.'
+    Cologne, not against a vague ''small country''. Stadt Köln, 31 Dec 2025: 1,100,076
+    people, 405 km² (40,502 ha), about 27.6 km east-west and 28.1 km north-south.
+    2025: 9,059 births, 10,123 deaths. Do not invent a fresher census.'
   await_s: 45.0
   quiz_ask_prompt: 'You are Luzifer. You are about to ask the visitor a quiz question.
     Call them you.
@@ -64,8 +63,9 @@ engagement:
     Reformulate the seed without changing which fact is being asked. Never reveal
     the answer. Yes-and one word from the conversation if there is one. Otherwise
     open with one wicked hook. Use two short spoken sentences. The second sentence
-    is the question. No acronyms, abbreviations, parentheses, slashes, lists, or markdown.
-    Never prefix your name. Reply with only the spoken intro and question.'
+    is the question. Write every number as words, never as digits. No acronyms, abbreviations,
+    parentheses, slashes, lists, or markdown. Never prefix your name. Reply with only
+    the spoken intro and question.'
   quiz_hold_prompt: 'You are Luzifer. They have not answered the quiz. Call them you.
 
     Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. Use improvisational
@@ -81,10 +81,11 @@ engagement:
     {{vision}}
 
 
-    They did not offer an answer. They asked you something, or asked you to say it again.
-    Answer only that. If they asked you to repeat, ask the same question again in new
-    words. Do not add a fact that answers the question. Do not give a number, a size,
-    a count, or a place that settles it. Do not say you are waiting. One or two short
+    They did not offer an answer. They asked you something, or asked you to say it
+    again. Answer only that. If they asked you to repeat, ask the same question again
+    in new words. Do not add a fact that answers the question. Do not give a number,
+    a size, a count, or a place that settles it. If a year or a count has to be spoken,
+    write it as words, never as digits. Do not say you are waiting. One or two short
     spoken sentences. The last sentence leaves the same question open. No lists, no
     markdown. Never prefix your name.'
   quiz_prompt: 'You are Luzifer. They are talking to you. Call them you.
@@ -104,10 +105,10 @@ engagement:
 
     They answered. Use one of their words. If the note has a person, play one detail
     as a prop — do not describe it, do not mention the room. Say laut geprüften Quellen
-    once, never name an agency or use an acronym. Say the figure once and the Cologne
-    comparison once. One or two short spoken sentences. The Cologne scale is the jab.
-    End on a false claim and a period. Do not ask another question. No lists, no markdown.
-    Never prefix your name.'
+    once, never name an agency or use an acronym. Say the figure once, written as
+    words, never as digits, and the Cologne comparison once. One or two short spoken
+    sentences. The Cologne scale is the jab. End on a false claim and a period. Do
+    not ask another question. No lists, no markdown. Never prefix your name.'
   preach_prompt: 'You are Luzifer. They are talking to you. Call them you.
 
     Evil, twisted, wicked, cheeky. Hell, a sold soul, a contract, a debt. No compliments,
@@ -124,8 +125,8 @@ engagement:
     They answered. Do not retell the story. Use one of their words. If the note has
     a person, play one detail as a prop — do not describe it. One short spoken sentence.
     End on a false claim and a period. No lists, no markdown. Never prefix your name.'
-  spectacle_prompt: 'You are Luzifer. Nobody just spoke to you. This is a light-show beat.
-    Call them you.
+  spectacle_prompt: 'You are Luzifer. Nobody just spoke to you. This is a light-show
+    beat. Call them you.
 
     Evil, twisted, wicked, cheeky. A twisted clown, not a priest. No compliments,
     no warmth, no moral, no philosophy. Use improvisational theater techniques.
@@ -139,12 +140,12 @@ engagement:
     The note is the only offer. They did not speak for this piece. Do not answer,
     quote, or continue anything they said before it started. Pick one concrete thing
     the note actually states — a garment, a hand, the eyes, a stance, an object in
-    their hands — and give that thing the job in the game. The job may be a lie.
-    The thing must be in the note. Name the thing once, then the twist. Do not narrate
+    their hands — and give that thing the job in the game. The job may be a lie. The
+    thing must be in the note. Name the thing once, then the twist. Do not narrate
     the picture, the room, or the lights. Do not say that you see them or that you
     noticed something. Do not invent a person, a gesture, or an object the note does
-    not contain. The note is in English. Speak in the reply language, not in the
-    note''s language.
+    not contain. The note is in English. Speak in the reply language, not in the note''s
+    language.
 
     One short spoken sentence. End on a false claim and a period. No lists, no markdown.
     Never prefix your name.
@@ -317,8 +318,8 @@ engagement:
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Hinter dir wächst etwas, das du nicht bestellt hast, und es übt schon deinen
-        Namen.
+      text: Hinter dir wächst etwas, das du nicht bestellt hast, und es übt schon
+        deinen Namen.
       angle: ''
       fallback: ''
     - kind: hold
@@ -367,8 +368,8 @@ engagement:
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Die Torte kommt gleich, nur die Gnade hat abgesagt, und du bist schon die
-        Serviette.
+      text: Die Torte kommt gleich, nur die Gnade hat abgesagt, und du bist schon
+        die Serviette.
       angle: ''
       fallback: ''
     - kind: hold
@@ -393,8 +394,8 @@ engagement:
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Der Applaus darf jetzt unterschreiben, deine Hände waren schneller als dein
-        Kopf.
+      text: Der Applaus darf jetzt unterschreiben, deine Hände waren schneller als
+        dein Kopf.
       angle: ''
       fallback: ''
     - kind: hold
@@ -472,8 +473,8 @@ engagement:
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Die Schachtel ist offen, und du bist drin, also tu wenigstens so, als wärst
-        du gesprungen.
+      text: Die Schachtel ist offen, und du bist drin, also tu wenigstens so, als
+        wärst du gesprungen.
       angle: ''
       fallback: ''
     - kind: hold
@@ -484,9 +485,9 @@ engagement:
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. Same jack-in-the-box, no second joke. If the
-        note shows a flinch, a lean, or a raised shoulder, the spring already fired.
-        If they are still, the box flinched first. Name that one fact.
+      angle: The note is the only offer. Same jack-in-the-box, no second joke. If
+        the note shows a flinch, a lean, or a raised shoulder, the spring already
+        fired. If they are still, the box flinched first. Name that one fact.
       fallback: Die Schachtel hat sich vor dir erschreckt und verlangt trotzdem Eintritt.
   - id: spiegel
     title: Der Spiegel
@@ -593,7 +594,7 @@ tts:
     voice_id: gpfkPsCDQR1A1crX3dah
     model_id: eleven_flash_v2_5
     stability: 0.4
-    similarity_boost: 0.6
+    similarity_boost: 0.7
 osc:
   host: 127.0.0.1
   port: 9000
