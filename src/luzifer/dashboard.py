@@ -268,7 +268,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               </div>
               <div id="floor-quiz-fields">
                 <label>Id</label><input id="eng_quiz_id" />
-                <label>Question (spoken, no LLM)</label><textarea id="eng_quiz_question" rows="3" style="min-height:4rem"></textarea>
+                <label>Question seed (performed by LLM)</label><textarea id="eng_quiz_question" rows="3" style="min-height:4rem"></textarea>
                 <label>Truth (private — for the roast)</label><textarea id="eng_quiz_truth" rows="3" style="min-height:4rem"></textarea>
                 <label>Angle</label><input id="eng_quiz_angle" />
               </div>
@@ -291,6 +291,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <details class="fold" open data-fold="floor-prompt">
             <summary><span class="fold-title">Overlay prompt</span></summary>
             <div class="fold-body">
+              <div id="floor-quiz-ask-prompt">
+                <label>Quiz intro prompt</label>
+                <textarea id="eng_quiz_ask_prompt" rows="12" style="min-height:14rem"></textarea>
+              </div>
+              <label id="eng_overlay_prompt_label">Reply prompt</label>
               <p class="hint" id="floor_prompt_hint">Used for the one LLM reply after they answer. Placeholders: {{question}} {{truth}} {{angle}} {{vision}}</p>
               <textarea id="eng_overlay_prompt" rows="12" style="min-height:14rem"></textarea>
             </div>
@@ -1076,6 +1081,7 @@ async function fetchElevenLabsVoices(){
 function defaultEngagement(){
   return {
     await_s: 45,
+    quiz_ask_prompt: "",
     quiz_prompt: "",
     preach_prompt: "",
     spectacle_prompt: "",
@@ -1121,6 +1127,9 @@ function pullCardFieldsIntoDraft(){
     card.id = document.getElementById("eng_spec_id").value.trim();
     card.title = document.getElementById("eng_spec_title").value;
     card.beats = collectBeatsFromDom();
+  }
+  if (floorMode === "quiz") {
+    engagementDraft.quiz_ask_prompt = document.getElementById("eng_quiz_ask_prompt").value;
   }
   const promptKey = floorMode + "_prompt";
   engagementDraft[promptKey] = document.getElementById("eng_overlay_prompt").value;
@@ -1197,8 +1206,12 @@ function pushCardFieldsFromDraft(){
   document.getElementById("floor-quiz-fields").hidden = floorMode !== "quiz";
   document.getElementById("floor-preach-fields").hidden = floorMode !== "preach";
   document.getElementById("floor-spectacle-fields").hidden = floorMode !== "spectacle";
+  document.getElementById("floor-quiz-ask-prompt").hidden = floorMode !== "quiz";
+  document.getElementById("eng_quiz_ask_prompt").value = engagementDraft.quiz_ask_prompt || "";
+  document.getElementById("eng_overlay_prompt_label").textContent =
+    floorMode === "quiz" ? "Answer roast prompt" : "Reply prompt";
   const hints = {
-    quiz: "Used for the one roast after they answer. Placeholders: {{question}} {{truth}} {{angle}} {{vision}}",
+    quiz: "Intro placeholders: {{question}} {{angle}} {{vision}}. Roast placeholders: {{question}} {{truth}} {{angle}} {{vision}}",
     preach: "Used for the one reply after they answer. Placeholders: {{title}} {{hook}} {{vision}}",
     spectacle: "Used for each vision beat. Placeholders: {{angle}} {{vision}}",
   };
@@ -1502,7 +1515,7 @@ document.getElementById("eng_beat_add").onclick = () => {
 };
 ["eng_quiz_id","eng_quiz_question","eng_quiz_truth","eng_quiz_angle",
  "eng_preach_id","eng_preach_title","eng_preach_text",
- "eng_spec_id","eng_spec_title","eng_overlay_prompt","engagement.await_s"
+ "eng_spec_id","eng_spec_title","eng_quiz_ask_prompt","eng_overlay_prompt","engagement.await_s"
 ].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("input", markEngDirty);

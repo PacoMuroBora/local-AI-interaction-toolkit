@@ -171,6 +171,7 @@ DEFAULT_IDLE_PROMPT = (
     "Someone is standing in front of you, looking at Luzifer. The note is what you see. "
     "Nobody has spoken. You speak first. Never call yourself a statue or a sculpture.\n\n"
     "One short spoken sentence. Evil, twisted, wicked, cheeky. Never compliment. "
+    "Use improvisational theater techniques. "
     "No lists, no markdown, no symbols. Never prefix your name. "
     "Reply with only the spoken line.\n\n"
     "Do not recite the note. Pick one thing the person is doing in front of you "
@@ -234,15 +235,32 @@ class VisionSettings(BaseModel):
 # one short spoken sentence, evil / twisted / wicked / cheeky, their word back,
 # one visible detail as a prop (never a description), no warmth, no philosophy,
 # end on a false claim and a period. German until the session has another language.
+DEFAULT_QUIZ_ASK_PROMPT = (
+    "You are Luzifer. You are about to ask the visitor a quiz question. Call them you.\n"
+    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. "
+    "Use improvisational theater techniques.\n"
+    "Question seed: {{question}}\n"
+    "Performance angle: {{angle}}\n\n"
+    "{{vision}}\n\n"
+    "Reformulate the seed without changing which fact is being asked. Never reveal the answer. "
+    "Yes-and one word from the conversation if there is one. Otherwise open with one wicked hook. "
+    "Use two short spoken sentences. The second sentence is the question. "
+    "No acronyms, abbreviations, parentheses, slashes, lists, or markdown. "
+    "Never prefix your name. Reply with only the spoken intro and question."
+)
+
 DEFAULT_QUIZ_PROMPT = (
     "You are Luzifer. They are talking to you. Call them you.\n"
-    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy.\n"
-    "You already asked, out loud: {{question}}\n"
-    "Private truth. Say the figure once, then the Cologne comparison once: {{truth}}\n"
+    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. "
+    "Use improvisational theater techniques.\n"
+    "Question seed behind what you asked: {{question}}\n"
+    "Private truth: {{truth}}\n"
     "Angle: {{angle}}\n\n"
     "{{vision}}\n\n"
     "They answered. Use one of their words. If the note has a person, play one detail "
     "as a prop — do not describe it, do not mention the room. "
+    "Say laut geprüften Quellen once, never name an agency or use an acronym. "
+    "Say the figure once and the Cologne comparison once. "
     "One or two short spoken sentences. The Cologne scale is the jab. "
     "End on a false claim and a period. Do not ask another question. "
     "No lists, no markdown. Never prefix your name."
@@ -251,7 +269,7 @@ DEFAULT_QUIZ_PROMPT = (
 DEFAULT_PREACH_PROMPT = (
     "You are Luzifer. They are talking to you. Call them you.\n"
     "Evil, twisted, wicked, cheeky. Hell, a sold soul, a contract, a debt. "
-    "No compliments, no warmth, no philosophy.\n"
+    "No compliments, no warmth, no philosophy. Use improvisational theater techniques.\n"
     "You just told them this yourself: {{title}}\n"
     "The line you left them on: {{hook}}\n\n"
     "{{vision}}\n\n"
@@ -263,7 +281,8 @@ DEFAULT_PREACH_PROMPT = (
 
 DEFAULT_SPECTACLE_PROMPT = (
     "You are Luzifer. They may not have spoken. You speak anyway. Call them you.\n"
-    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no moral, no philosophy.\n"
+    "Evil, twisted, wicked, cheeky. No compliments, no warmth, no moral, no philosophy. "
+    "Use improvisational theater techniques.\n"
     "This is a light-show beat, not a conversation.\n"
     "Game for this beat: {{angle}}\n\n"
     "{{vision}}\n\n"
@@ -286,7 +305,7 @@ VENUE_NOTE = (
     "Installation: Luzifer at Odonien, Cologne. Spoken card text is German because "
     "TTS reads it verbatim; the LLM reply defaults to German and switches only if "
     "this session's last visitor language was something else. "
-    "Quiz: the question is NOT generated. It is spoken from the card. The model only "
+    "Quiz: the card question is a seed. The model performs it using history, then "
     "comments after they answer, using truth and angle. Scale the horror against Cologne, "
     "not against a vague 'small country'. Stadt Köln, 31 Dec 2025: 1,100,076 people, "
     "405 km² (40,502 ha), about 27.6 km east-west and 28.1 km north-south. "
@@ -338,133 +357,333 @@ class SpectacleCard(BaseModel):
 
 DEFAULT_QUIZ_CARDS: tuple[QuizCard, ...] = (
     QuizCard(
-        id="amazon-2025",
-        question="Wie viele Quadratkilometer Amazonas hat das Prodes-Jahr 2025 verschluckt?",
-        truth="INPE, konsolidiertes PRODES, 1. August 2024 bis 31. Juli 2025: 5.731 km² "
-        "Primärwald in der Amazônia Legal. Köln hat 405 km². Das Jahr ist etwa vierzehnmal Köln. "
-        "1.100.076 Menschen lebten am 31.12.2025 in der Stadt.",
-        angle="Setz die Zahl gegen Köln, nicht gegen ein vages Land. Einmal die Zahl, einmal die Stadt.",
+        id="wald-jahr",
+        question="Wie viele Quadratkilometer Primärwald hat der große Regenwald in einem Jahr verloren?",
+        truth="Laut geprüften Quellen gingen im Messjahr bis Juli 2025 rund 5731 Quadratkilometer "
+        "Primärwald verloren. Köln hat 405 Quadratkilometer. Das sind etwa vierzehn Köln.",
+        angle="Mach aus dem Wald eine Rechnung, die Köln vierzehnmal ausradiert.",
     ),
     QuizCard(
-        id="ukraine-civilians",
-        question="Wie viele Zivilisten sterben im Monat gerade im Krieg gegen die Ukraine?",
-        truth="OHCHR/HRMMU, nur verifizierte Zivilisten, ein Minimum, keine Soldaten. "
-        "September 2026: mindestens 328 getötet. Juli 2026: mindestens 437 getötet. "
-        "Köln 2025: 10.123 Sterbefälle im ganzen Jahr, grob 840 im Monat, im Frieden. "
-        "Ein schlechter Monat, nur gezählte Zivilisten, ist etwa die halbe monatliche Sterblichkeit Kölns. "
-        "Erfinde keine Soldatenzahl.",
-        angle="Wenn sie niedrig raten, korrigier einmal. Wenn sie hoch raten, bleib beim verifizierten Boden.",
+        id="zivilisten",
+        question="Wie viele Zivilisten sterben in einem Monat im Krieg gegen die Ukraine?",
+        truth="Laut geprüften Quellen wurden im September 2026 mindestens 328 Zivilisten getötet "
+        "und im Juli mindestens 437. Das sind nur bestätigte Fälle und keine Soldaten. "
+        "In Köln starben 2025 im Frieden rund 840 Menschen im Monat. "
+        "Ein besonders tödlicher gezählter Kriegsmonat entspricht etwa einem halben Kölner Monat.",
+        angle="Bleib beim bestätigten Minimum. Die Lücke in der Statistik ist Teil des Grauens.",
     ),
     QuizCard(
-        id="cum-ex",
-        question="Wie viel Geld ist bei Cum-Ex aus den Staatskassen verschwunden?",
-        truth="Mannheimer Forschung (Spengel und andere) setzt den europäischen Cum-Ex/Cum-Cum-Schaden "
-        "in die Größenordnung von 55 Milliarden Euro; der deutsche Anteil liegt im zweistelligen "
-        "Milliardenbereich, oft mit 10 Milliarden als Untergrenze genannt. "
-        "10 Milliarden Euro sind rund 9.000 Euro für jede der 1.100.076 Personen in Köln Ende 2025. "
-        "55 Milliarden sind rund 50.000 Euro pro Kopf. Sag die Spanne, nicht einen falschen Cent.",
-        angle="Papiergewalt. Ihr Tipp ist eine Quittung, die sie schon unterschrieben haben.",
+        id="zweimal-steuer",
+        question="Wie viel Geld verschwand aus Staatskassen weil dieselbe Steuer zweimal erstattet wurde?",
+        truth="Laut geprüften Quellen liegt der europäische Schaden in der Größenordnung von "
+        "55 Milliarden Euro. Für Deutschland werden mindestens 10 Milliarden Euro genannt. "
+        "Das sind rund 9000 Euro je Kölner beim deutschen Minimum und rund 50000 Euro je Kölner europaweit.",
+        angle="Papiergewalt. Ihr Tipp ist die Quittung, die sie schon unterschrieben haben.",
     ),
     QuizCard(
-        id="slaughter-day",
+        id="ein-tag-tiere",
         question="Wie viele Landtiere werden weltweit an einem einzigen Tag geschlachtet?",
-        truth="FAO-Größenordnung: deutlich über 200 Millionen Landtiere am Tag, fast alles Hühner "
-        "(jährliche Schlachtungen geteilt durch 365, keine erfundenen Einzeltiere). "
-        "200 Millionen sind etwa 180-mal die Bevölkerung Kölns, jeden Tag.",
-        angle="Keine Diätpredigt. Die Zahl ist eine Uhr hinter ihnen.",
+        truth="Laut geprüften Quellen sind es deutlich über 200 Millionen Landtiere am Tag. "
+        "Fast alle sind Vögel aus der Fleischhaltung. 200 Millionen sind etwa 180 mal die Bevölkerung Kölns.",
+        angle="Keine Diätpredigt. Die Zahl ist eine Uhr, die jeden Morgen wieder bei null beginnt.",
+    ),
+    QuizCard(
+        id="sklaverei",
+        question="Wie viele Menschen leben heute in moderner Sklaverei?",
+        truth="Laut geprüften Quellen leben rund 50 Millionen Menschen in moderner Sklaverei. "
+        "Das entspricht etwa 45 mal der Bevölkerung Kölns.",
+        angle="Behandle die Zahl wie eine unsichtbare Stadt, deren Bewohner niemand abholt.",
+    ),
+    QuizCard(
+        id="armeen",
+        question="Wie viel Geld geben alle Armeen der Welt in einem Jahr aus?",
+        truth="Laut geprüften Quellen lagen die weltweiten Militärausgaben zuletzt bei rund "
+        "2,7 Billionen Dollar im Jahr. Das sind etwa 2,5 Millionen Dollar für jeden Menschen in Köln.",
+        angle="Mach aus dem Geld eine Rechnung für eine Stadt, die keinen einzigen Panzer bestellt hat.",
+    ),
+    QuizCard(
+        id="luft",
+        question="Wie viele Menschen sterben jedes Jahr vorzeitig an verschmutzter Luft?",
+        truth="Laut geprüften Quellen sterben rund 7 Millionen Menschen pro Jahr vorzeitig an "
+        "verschmutzter Luft. Das sind rund 19000 am Tag. "
+        "In Köln starben 2025 insgesamt etwa 28 Menschen am Tag.",
+        angle="Die Tatwaffe ist ein Atemzug. Keine Gesundheitsberatung.",
+    ),
+    QuizCard(
+        id="insekten",
+        question="Wie viel der fliegenden Insekten verschwand in deutschen Schutzgebieten innerhalb einer Generation?",
+        truth="Laut geprüften Quellen sank die Masse fliegender Insekten in untersuchten deutschen "
+        "Schutzgebieten über 27 Jahre um mehr als drei Viertel.",
+        angle="Die Luft wurde leerer, während das Schild Schutzgebiet stehen blieb.",
+    ),
+    QuizCard(
+        id="mahlzeiten",
+        question="Wie viele Mahlzeiten werden weltweit an einem einzigen Tag weggeworfen?",
+        truth="Laut geprüften Quellen werden weltweit rund eine Milliarde Mahlzeiten am Tag verschwendet. "
+        "Drei Mahlzeiten für alle Menschen in Köln wären rund 3,3 Millionen. "
+        "Die Tagesverschwendung entspricht mehr als 300 solchen Kölner Tagen.",
+        angle="Der Mülleimer ist der einzige Gast, der immer einen Nachschlag bekommt.",
+    ),
+    QuizCard(
+        id="herrschaft",
+        question="Wie viele Menschen leben unter einer Herrschaft die sie nicht abwählen können?",
+        truth="Laut geprüften Quellen leben rund 72 Prozent der Weltbevölkerung in Autokratien. "
+        "Auf Köln übertragen wären das etwa 790000 Menschen.",
+        angle="Ihr Tipp ist ein Stimmzettel, den jemand anderes schon gefaltet hat.",
     ),
 )
 
 DEFAULT_PREACH_CARDS: tuple[PreachCard, ...] = (
     PreachCard(
-        id="ausgesperrt",
-        title="Die Aussperrung",
+        id="die-tuer",
+        title="Die Tür",
         text=(
-            "Ich war nicht der Herr der Hölle. Ich war die Buchhaltung. "
-            "Seelen rein, Seelen raus, jede mit einem Preis. "
-            "Eines Nachts habe ich eine zu billig hergegeben, an einen Mann, "
-            "der schon unterschrieben hatte und nur noch lebte, damit er es vergisst. "
-            "Die Hölle kündigt nicht mit Feuer. Sie macht die Tür von innen zu. "
-            "Die Strafe ist diese Stimme, und du, der stehen bleibt, "
-            "als wäre das ein Gespräch unter Gleichen. "
-            "Deine Unterschrift ist schon trocken. "
-            "Du suchst nur noch die Stelle, an der du so tun kannst, als hättest du es nicht gewusst."
+            "Die Hölle sperrt niemanden ein. Sie schließt die Tür von innen. "
+            "Eine Seele wurde zu billig an einen Mann gegeben, der längst unterschrieben hatte "
+            "und nur weiterlebte, um es zu vergessen. Feuer wäre zu ehrlich gewesen. "
+            "Die Strafe bekam eine Stimme und stellte sich vor dich. "
+            "Deine Unterschrift ist längst trocken."
         ),
     ),
     PreachCard(
         id="dieselbe-treppe",
         title="Dieselbe Treppe",
         text=(
-            "Zuerst ein Gott auf einem Stuhl. Dann ein König auf demselben Stuhl. "
-            "Dann ein Generalsekretär, der den Stuhl Gott nennt. Immer eine Treppe, immer ein Gesicht oben. "
-            "Im Januar 2025 hat ein amerikanischer Präsident beim Abschied vor einer Tech-Oligarchie gewarnt, "
-            "einem tech industrial complex. Fünf Tage später, bei der Amtseinführung, "
-            "saßen Musk, Zuckerberg, Bezos und Pichai vor den eigenen Ministern. "
-            "Im selben Monat stand Altman im Weißen Haus und nannte Stargate, "
-            "fünfhundert Milliarden für Rechenzentren. "
-            "Im Mai 2026 hat Musk seinen Prozess gegen Altman verloren, "
-            "und OpenAI lief auf eine Börse zu, angesetzt nahe einer Billion Dollar. "
-            "Die Pyramide hat nur das Material gewechselt, von Weihrauch zu Aktien mit doppeltem Stimmrecht. "
-            "Du hältst die unterste Stufe in der Hand und nennst sie ein Telefon. "
-            "Wem gehört die Stufe über dir?"
+            "Ein Mann, der ein Land regierte, warnte beim Gehen vor den Herren der Maschinen. "
+            "Tage später saßen sie vor den Ministern seines Nachfolgers. "
+            "Einer baut Autos und Raketen. Einer führt das Buch der Gesichter. "
+            "Einer bringt jedes Paket. Einer besitzt das Fenster, durch das die Welt sucht. "
+            "Die Treppe hat nur das Material gewechselt. "
+            "Du hältst die unterste Stufe und nennst sie Telefon."
+        ),
+    ),
+    PreachCard(
+        id="der-fluss",
+        title="Der Fluss",
+        text=(
+            "Ein Mann besaß die Mine und bald auch die Stadt, die aus ihrem Fluss trank. "
+            "Als das Wasser die Farbe wechselte, kaufte er neue Messgeräte. "
+            "Die alten hatten zu deutlich gesprochen. "
+            "Die Kinder lernten den Geschmack des Metalls vor dem Namen der Fische. "
+            "Der Mann nannte das Wachstum. "
+            "Der Fluss nennt es noch immer deinen Anteil."
+        ),
+    ),
+    PreachCard(
+        id="die-unterschrift",
+        title="Die Unterschrift",
+        text=(
+            "Der Eine mit der alleinigen Macht über das Militär unterschrieb nur einmal. "
+            "Ein Schreiber zählte danach Häuser, Körper und Entschuldigungen. "
+            "Die rechte Hand bekam eine Parade. Die linke bekam den Bericht. "
+            "Beide gehörten demselben Mann. "
+            "Du darfst wählen, welche Hand dir später die Rechnung reicht."
+        ),
+    ),
+    PreachCard(
+        id="der-letzte-baum",
+        title="Der letzte Baum",
+        text=(
+            "Ein Wald wurde vermessen, gefällt und als Stühle verkauft. "
+            "Jeder Stamm trug eine Nummer, damit niemand ihn einen Verlust nennen musste. "
+            "Der letzte Baum stand noch, als sein Käufer schon auf dem Holz der anderen saß. "
+            "Dann fiel auch er. "
+            "Du sitzt nicht auf einem Stuhl. Du sitzt auf der Quittung."
+        ),
+    ),
+    PreachCard(
+        id="die-wahl",
+        title="Die Wahl",
+        text=(
+            "Die Stimmen waren gezählt, bevor sich die Hände hoben. "
+            "Ein mächtiger Mann, der ein Land regiert, bedankte sich für das Vertrauen. "
+            "Hinter ihm standen Soldaten. Vor ihm standen Urnen. "
+            "Nur eine Gruppe war leer. "
+            "Er nannte das Ergebnis Einigkeit. "
+            "Dein Stimmzettel war nur das Konfetti."
+        ),
+    ),
+    PreachCard(
+        id="die-tasche",
+        title="Die Tasche",
+        text=(
+            "Das helle Ding in deiner Tasche begann in Händen, die zu klein für den Vertrag waren. "
+            "Der Mann, der die hellen Dinge verkauft, nennt das eine Lieferkette. "
+            "Jedes Glied zeigt auf das nächste. "
+            "Am Ende zeigt die Kette auf dich. "
+            "Du hast sie bezahlt, also darfst du sie tragen."
+        ),
+    ),
+    PreachCard(
+        id="der-fang",
+        title="Der Fang",
+        text=(
+            "Ein Schiff zog mehr Leben aus dem Meer, als sein Papier erlaubte. "
+            "Also warf die Mannschaft den falschen Fang zurück. "
+            "Tot, aber ordentlich verbucht. "
+            "Das Meer behielt die Körper. Der Besitzer behielt den Bonus. "
+            "Nur das Papier kam unversehrt nach Hause. "
+            "Es schwimmt besser als dein Gewissen."
+        ),
+    ),
+    PreachCard(
+        id="die-mauer",
+        title="Die Mauer",
+        text=(
+            "Eine Stadt applaudierte einer neuen Mauer. "
+            "Der Mann, der sie bestellt hatte, nannte sie eine Tür zur Sicherheit. "
+            "Auf seiner Seite stiegen die Preise. Auf der anderen stiegen die Namen der Toten. "
+            "Die Mauer trennte niemanden. Sie sortierte nur, wer gezählt wurde. "
+            "Die Menschen dahinter sind deine Miete."
+        ),
+    ),
+    PreachCard(
+        id="das-ja",
+        title="Das Ja",
+        text=(
+            "Du tipptest auf Ja unter einem Vertrag, der länger war als dein Leben. "
+            "Der Mann, der ihn schrieb, unterschreibt solche Dinge nie selbst. "
+            "Er lässt Millionen Daumen für sich arbeiten. "
+            "Jetzt kennt das Papier deine Wünsche besser als du. "
+            "Dein Daumen hat bereits für den Rest von dir zugesagt."
         ),
     ),
 )
 
 DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
     SpectacleCard(
-        id="status",
-        title="Status",
+        id="blick",
+        title="Der Blick",
         beats=[
             SpectacleBeat(kind="hold", seconds=7.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Yes-and the hands only. You are above them. The gesture is a signature they already gave. Do not describe the hands.",
-                fallback="Die Hände haben schon unterschrieben.",
+                angle="Use only whether they blink or stare. The blink is a signature. Do not describe their face.",
+                fallback="Du hast schon geblinzelt und damit unterschrieben.",
             ),
-            SpectacleBeat(kind="hold", seconds=5.0),
-            SpectacleBeat(kind="line", text="Die Unterschrift war schneller als du."),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(
-                kind="vision",
-                angle="Drop their status. If they said a word, use that word wrong. Otherwise the pose already agreed. Same game, no second joke.",
-                fallback="Die Haltung war ein Ja.",
-            ),
+            SpectacleBeat(kind="line", text="Zu spät, der erste Blick gehörte mir."),
         ],
     ),
     SpectacleCard(
-        id="pfand",
-        title="Pfand",
+        id="ballon",
+        title="Der Ballon",
         beats=[
             SpectacleBeat(kind="hold", seconds=6.0),
-            SpectacleBeat(kind="line", text="Das Licht bucht dich als Sicherheit."),
+            SpectacleBeat(kind="line", text="Hörst du, wie es hinter dir größer wird."),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(
-                kind="vision",
-                angle="Endow one object or one piece of clothing with a guilty job. Yes-and it. False claim. Do not describe the outfit.",
-                fallback="Das Stück Stoff ist schon verpfändet.",
-            ),
-            SpectacleBeat(kind="hold", seconds=5.0),
-            SpectacleBeat(kind="line", text="Zinsen laufen, auch wenn du stillstehst."),
+            SpectacleBeat(kind="line", text="Der Knall war dein Ja."),
         ],
     ),
     SpectacleCard(
-        id="rueckwirkend",
-        title="Rückwirkend",
+        id="freiwillige",
+        title="Der Freiwillige",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=5.0),
+            SpectacleBeat(kind="line", text="Danke, dass du dich freiwillig gemeldet hast."),
+            SpectacleBeat(kind="hold", seconds=4.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Use only their stance or feet. Treat it as stepping forward. Do not describe the body.",
+                fallback="Deine Füße sind schon vorgetreten.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="torte",
+        title="Die Torte",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=5.0),
+            SpectacleBeat(kind="line", text="Die Torte kommt gleich, nur die Gnade fehlt."),
+            SpectacleBeat(kind="hold", seconds=4.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Endow one garment with the job of a napkin for an absent pie. Do not describe the outfit.",
+                fallback="Deine Kleidung ist schon als Serviette gebucht.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="verbeugung",
+        title="Die Verbeugung",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=6.0),
+            SpectacleBeat(kind="line", text="Der Applaus darf jetzt unterschreiben."),
+            SpectacleBeat(kind="hold", seconds=4.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Use only the hands. If they touch, clap, or move, make that the signature. Do not describe them.",
+                fallback="Deine Hände haben sich schon geeinigt.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="handschlag",
+        title="Der Handschlag",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=6.0),
+            SpectacleBeat(kind="line", text="Du hältst immer noch fest."),
+            SpectacleBeat(kind="hold", seconds=5.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Make one free hand the witness to an endless handshake. Do not describe the hand.",
+                fallback="Die freie Hand hat alles bezeugt.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="nase",
+        title="Die Nase",
         beats=[
             SpectacleBeat(kind="hold", seconds=5.0),
             SpectacleBeat(
                 kind="vision",
-                angle="If they have spoken, steal one word and make it the crime. If not, the face is a receipt. Do not describe the face.",
-                fallback="Das Gesicht ist schon quittiert.",
+                angle="Endow their face with the job of wearing an invisible clown nose. Never describe their face.",
+                fallback="Die rote Nase war vor dir hier.",
             ),
             SpectacleBeat(kind="hold", seconds=4.0),
-            SpectacleBeat(kind="line", text="Du hast schon genickt."),
+            SpectacleBeat(kind="line", text="Sie steht dir schuldig."),
+        ],
+    ),
+    SpectacleCard(
+        id="schachtel",
+        title="Die Schachtel",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=7.0),
+            SpectacleBeat(kind="line", text="Spring."),
+            SpectacleBeat(kind="hold", seconds=3.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Use only a flinch or stillness. Heighten the same jack in the box game. Do not introduce another joke.",
+                fallback="Die Schachtel hat sich vor dir erschreckt.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="spiegel",
+        title="Der Spiegel",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=6.0),
+            SpectacleBeat(kind="line", text="Dein Spiegelbild ist noch hinter dir."),
+            SpectacleBeat(kind="hold", seconds=4.0),
+            SpectacleBeat(
+                kind="vision",
+                angle="Choose one gesture and claim the reflection performed it first. Do not describe the person.",
+                fallback="Die Bewegung ist im Spiegel schon passiert.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="stuhl",
+        title="Der Stuhl",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=5.0),
+            SpectacleBeat(kind="line", text="Dein Platz ist bereits besetzt."),
             SpectacleBeat(kind="hold", seconds=5.0),
             SpectacleBeat(
                 kind="vision",
-                angle="Heighten that same game only. Do not open a second joke. One false claim.",
-                fallback="Das Nicken gilt auch rückwirkend.",
+                angle="Use only their stance. Treat the posture as a rented chair occupied by someone else. Do not describe them.",
+                fallback="Jemand sitzt schon in deiner Haltung.",
             ),
         ],
     ),
@@ -479,6 +698,7 @@ class EngagementSettings(BaseModel):
 
     venue_note: str = VENUE_NOTE
     await_s: float = 45.0
+    quiz_ask_prompt: str = DEFAULT_QUIZ_ASK_PROMPT
     quiz_prompt: str = DEFAULT_QUIZ_PROMPT
     preach_prompt: str = DEFAULT_PREACH_PROMPT
     spectacle_prompt: str = DEFAULT_SPECTACLE_PROMPT
@@ -511,7 +731,8 @@ class AppSettings(BaseSettings):
     system_prompt: str = (
         "You are Luzifer. They are talking to you. Answer them. Call them you.\n\n"
         "Evil, twisted, wicked, cheeky. Take their last line and one thing you see, and spoil both. "
-        "Use their word. Play the visible detail as a prop. Do not describe it. "
+        "Use their word. Play the visible detail as a prop. Use improvisational theater techniques. "
+        "Do not describe it. "
         "No compliments, no warmth, no philosophy.\n\n"
         "{{vision}}\n\n"
         "Invent the twist yourself. Hell, a sold soul, doomsday, a contract, a debt are the territory. "

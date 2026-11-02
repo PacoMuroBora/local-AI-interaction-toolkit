@@ -1008,13 +1008,42 @@ class Pipeline:
         guessed = guess_lang_from_text(question)
         if guessed:
             self._set_turn_language(guessed, source="text")
-        self.last_ai_text = question
-        await self.osc.send_ai_text(question)
-        await self._notify()
-        await self._speak_text(question)
+        settings = await self.store.get()
+        vision_block = await self._vision_block_for_prompt()
+        system = render_engagement_prompt(
+            settings.engagement.quiz_ask_prompt,
+            {
+                "question": question,
+                "angle": str(getattr(card, "angle", "") or ""),
+                "vision": vision_block,
+            },
+        )
+        system = insert_before_goal(system, language_system_suffix(self.last_language)).strip()
+        self.engagement.last_rendered_prompt = system
+        history = list(self._history) if settings.llm.history_turns > 0 else []
+        user = (
+            "[quiz introduction]\n"
+            "Perform the question seed now. Do not answer it. "
+            "Return only the two short spoken sentences."
+        )
+        await self.set_state("thinking")
+        try:
+            generated = await self.llm.chat(user, system, settings.llm, history=history)
+        except asyncio.CancelledError:
+            await self.set_state("listening")
+            raise
         if self._interrupt.is_set():
             return
-        self._append_assistant_history(question)
+        spoken_question = (generated or "").strip()
+        if not spoken_question or spoken_question.strip(" .!?").upper() == "SILENT":
+            spoken_question = question
+        self.last_ai_text = spoken_question
+        await self.osc.send_ai_text(spoken_question)
+        await self._notify()
+        await self._speak_text(spoken_question)
+        if self._interrupt.is_set():
+            return
+        self._append_assistant_history(spoken_question)
         self.engagement.arm_await(self.store.settings.engagement.await_s)
         await self._notify()
         await self.set_state("listening")
@@ -1117,7 +1146,8 @@ class Pipeline:
         )
         await self.set_state("thinking")
         try:
-            ai_text = await self.llm.chat(user, system, settings.llm, history=[])
+            history = list(self._history) if settings.llm.history_turns > 0 else []
+            ai_text = await self.llm.chat(user, system, settings.llm, history=history)
         except asyncio.CancelledError:
             await self.set_state("listening")
             raise
