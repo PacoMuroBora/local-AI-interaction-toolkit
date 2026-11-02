@@ -18,6 +18,7 @@ venv/
 runtime/output/*
 !runtime/output/.gitkeep
 runtime/secrets.yaml
+runtime/engagement.json
 
 # IDE / OS
 .idea/

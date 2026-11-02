@@ -19,9 +19,12 @@ from luzifer.osc.td_server import (
     ADDR_INTERRUPT,
     ADDR_LISTEN,
     ADDR_GOAL,
+    ADDR_PREACH,
+    ADDR_QUIZ,
     ADDR_RESET,
     ADDR_SAY,
     ADDR_SPEAK,
+    ADDR_SPECTACLE,
     ADDR_VISION,
     TouchDesignerOscServer,
 )
@@ -159,14 +162,36 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .bar.gpu > i { background:linear-gradient(90deg,#9e6a03,#d29922); }
     .bar.vram > i { background:linear-gradient(90deg,#8957e5,#a371f7); }
     .metrics .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.75rem; color:#e8eaed; min-width:4.5rem; }
-    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } .floor-cols { grid-template-columns: 1fr; } }
+    .floor-cols { display:grid; grid-template-columns: 1fr 1.2fr 1fr; gap:1rem; }
+    .floor-mode-tabs { display:flex; gap:.35rem; flex-wrap:wrap; margin:0 0 .75rem; }
+    .floor-mode-tabs .mode-btn { background:#0f1115; color:#9aa0a6; border:1px solid #2a2f3a; border-radius:8px;
+      padding:.45rem .85rem; cursor:pointer; font-weight:600; }
+    .floor-mode-tabs .mode-btn.active { background:#1f6feb; color:white; border-color:#1f6feb; }
+    .floor-live { background:#0f1115; border:1px solid #2a2f3a; border-radius:10px; padding:.75rem .85rem; margin:0 0 .75rem; }
+    .floor-live .phase { font-size:.95rem; font-weight:600; color:#79b8ff; }
+    .floor-live .meta { color:#9aa0a6; font-size:.8rem; margin-top:.35rem; font-variant-numeric:tabular-nums; }
+    .floor-prompt-preview { white-space:pre-wrap; background:#0f1115; border:1px solid #2a2f3a; border-radius:8px;
+      padding:.65rem .75rem; min-height:6rem; max-height:14rem; overflow:auto; font-size:.75rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#9aa0a6; }
+    .beat-row { display:grid; grid-template-columns: 6rem 1fr auto; gap:.4rem; align-items:start;
+      background:#0f1115; border:1px solid #2a2f3a; border-radius:8px; padding:.45rem; margin:.35rem 0; }
+    .beat-row .beat-fields { display:flex; flex-direction:column; gap:.3rem; }
+    .beat-row input, .beat-row select, .beat-row textarea { margin:0; padding:.4rem .5rem; font-size:.8rem; }
+    .beat-row textarea { min-height:2.4rem; }
+    .eng-strip { display:flex; gap:.75rem 1.25rem; align-items:center; flex-wrap:wrap; margin:0 0 .75rem;
+      padding:.55rem .75rem; border:1px solid #2a2f3a; border-radius:8px; background:#0f1115;
+      font-size:.8rem; color:#9aa0a6; }
+    .eng-strip strong { color:#e8eaed; font-weight:600; }
+    .eng-strip .on-show { color:#d29922; }
   </style>
 </head>
 <body>
   <header>
     <input id="name" class="brand" value="Luzifer" spellcheck="false" title="Installation name" />
     <nav class="tabs">
-      <button class="tab active" data-tab="audio-in">Audio In</button>
+      <button class="tab active" data-tab="floor">Floor</button>
+      <button class="tab" data-tab="audio-in">Audio In</button>
       <button class="tab" data-tab="audio-out">Audio Out</button>
       <button class="tab" data-tab="prompt-llm">Prompt / LLM</button>
       <button class="tab" data-tab="vision">Vision</button>
@@ -186,7 +211,101 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 
   <main>
-    <section id="panel-audio-in" class="panel active">
+    <section id="panel-floor" class="panel active">
+      <div class="floor-live">
+        <div class="phase"><span id="eng_mode_live">idle</span> · <span id="eng_phase_live">idle</span></div>
+        <div class="meta">
+          card <span id="eng_card_live">—</span>
+          · show <span id="eng_show_live">0</span>
+          · await <span id="eng_await_live">—</span>
+        </div>
+      </div>
+      <div class="floor-mode-tabs">
+        <button type="button" class="mode-btn active" data-floor-mode="quiz">Quiz of destruction</button>
+        <button type="button" class="mode-btn" data-floor-mode="preach">Preach / story</button>
+        <button type="button" class="mode-btn" data-floor-mode="spectacle">Spectacle</button>
+      </div>
+      <div class="floor-cols">
+        <div>
+          <details class="fold" open data-fold="floor-fire">
+            <summary><span class="fold-title">Fire</span><span class="fold-note" id="floor_deck_note"></span></summary>
+            <div class="fold-body">
+              <p class="hint">Saves dirty deck edits, then plays the next card. Replay uses the last fired card. Skip advances the cursor without speaking.</p>
+              <div class="row">
+                <button id="eng_fire" type="button">Fire</button>
+                <button id="eng_replay" class="secondary" type="button">Replay last</button>
+                <button id="eng_skip" class="secondary" type="button">Skip</button>
+              </div>
+              <label>Await window (s)</label>
+              <input id="engagement.await_s" type="number" step="1" min="5" />
+              <p class="hint">Quiz / preach: how long to wait for an answer before the piece dies. Speech resets the timer.</p>
+              <label>Next card</label>
+              <div class="live" id="floor_next_preview">—</div>
+            </div>
+          </details>
+          <details class="fold" open data-fold="floor-osc">
+            <summary><span class="fold-title">Live OSC</span></summary>
+            <div class="fold-body">
+              <div class="live" style="font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">
+                /ai/engagement <span id="eng_osc_mode">idle</span><br/>
+                /ai/engagement_phase <span id="eng_osc_phase">idle</span><br/>
+                /ai/engagement_card <span id="eng_osc_card"></span><br/>
+                /ai/show <span id="eng_osc_show">0</span> · /ai/show_s <span id="eng_osc_show_s">0</span>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div>
+          <details class="fold" open data-fold="floor-card">
+            <summary><span class="fold-title">Card editor</span><span class="fold-note" id="floor_card_note"></span></summary>
+            <div class="fold-body">
+              <div class="row">
+                <button id="eng_card_prev" class="secondary" type="button">◀</button>
+                <span id="eng_card_pos" style="font-variant-numeric:tabular-nums;color:#9aa0a6;font-size:.85rem">1 / 1</span>
+                <button id="eng_card_next" class="secondary" type="button">▶</button>
+                <button id="eng_card_add" class="secondary" type="button">Add</button>
+                <button id="eng_card_del" class="secondary" type="button">Delete</button>
+              </div>
+              <div id="floor-quiz-fields">
+                <label>Id</label><input id="eng_quiz_id" />
+                <label>Question (spoken, no LLM)</label><textarea id="eng_quiz_question" rows="3" style="min-height:4rem"></textarea>
+                <label>Truth (private — for the roast)</label><textarea id="eng_quiz_truth" rows="3" style="min-height:4rem"></textarea>
+                <label>Angle</label><input id="eng_quiz_angle" />
+              </div>
+              <div id="floor-preach-fields" hidden>
+                <label>Id</label><input id="eng_preach_id" />
+                <label>Title</label><input id="eng_preach_title" />
+                <label>Script (spoken whole; end on a hook)</label><textarea id="eng_preach_text" rows="10" style="min-height:12rem"></textarea>
+              </div>
+              <div id="floor-spectacle-fields" hidden>
+                <label>Id</label><input id="eng_spec_id" />
+                <label>Title</label><input id="eng_spec_title" />
+                <label>Beats</label>
+                <div id="eng_beats"></div>
+                <div class="row"><button id="eng_beat_add" class="secondary" type="button">Add beat</button></div>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div>
+          <details class="fold" open data-fold="floor-prompt">
+            <summary><span class="fold-title">Overlay prompt</span></summary>
+            <div class="fold-body">
+              <p class="hint" id="floor_prompt_hint">Used for the one LLM reply after they answer. Placeholders: {{question}} {{truth}} {{angle}} {{vision}}</p>
+              <textarea id="eng_overlay_prompt" rows="12" style="min-height:14rem"></textarea>
+            </div>
+          </details>
+          <details class="fold" data-fold="floor-rendered">
+            <summary><span class="fold-title">Last rendered system prompt</span></summary>
+            <div class="fold-body">
+              <div class="floor-prompt-preview" id="eng_rendered_prompt">(none yet)</div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-audio-in" class="panel">
       <details class="fold" open data-fold="mic">
         <summary><span class="fold-title">Microphone / VAD</span></summary>
         <div class="fold-body">
@@ -417,6 +536,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <label>Idle After (s)</label><input id="vision.idle_after_s" type="number" step="0.5" />
           <label>Speak Cooldown (s)</label><input id="vision.speak_cooldown_s" type="number" step="0.5" />
           <label>Sample Interval (s)</label><input id="vision.interval_s" type="number" step="0.5" />
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.85rem">
+            <input id="vision.absent_reset" type="checkbox" style="width:auto" />
+            Reset session when nobody is in frame
+          </label>
+          <label>Empty captions before reset</label>
+          <input id="vision.absent_reset_count" type="number" min="1" step="1" />
+          <p class="hint">Counts local-idle captions that say <code>NO_PERSON</code>. A person clears the count. TD still pulses <code>/ai/in/reset</code>.</p>
+          <p class="hint" id="absent_streak_live">Empty in a row: 0 / 2</p>
           <label>Change Threshold (0 = off)</label><input id="vision.change_threshold" type="number" step="0.5" />
           <label>Max Caption Age (s)</label><input id="vision.max_age_s" type="number" step="1" />
         </div>
@@ -489,7 +616,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <table class="io-table">
             <thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead>
             <tbody>
-              <tr><td><code>/ai/state</code></td><td class="typ">string</td><td>DAT. <code>loading</code>, <code>listening</code>, <code>stt</code>, <code>thinking</code>, <code>synthesizing</code>, <code>speaking</code>.</td></tr>
+              <tr><td><code>/ai/state</code></td><td class="typ">string</td><td>DAT. <code>loading</code>, <code>listening</code>, <code>stt</code>, <code>thinking</code>, <code>synthesizing</code>, <code>speaking</code>, <code>holding</code>.</td></tr>
               <tr><td><code>/ai/user_text</code></td><td class="typ">string</td><td>DAT. Visitor transcript.</td></tr>
               <tr><td><code>/ai/ai_text</code></td><td class="typ">string</td><td>DAT. AI reply.</td></tr>
               <tr><td><code>/ai/vision_text</code></td><td class="typ">string</td><td>DAT. Latest NDI caption.</td></tr>
@@ -502,6 +629,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               <tr><td><code>/ai/play</code></td><td class="typ">int</td><td>CHOP. <code>1</code> once the wav exists, back to <code>0</code> when speaking ends. Trigger playback on the rising edge.</td></tr>
               <tr><td><code>/ai/vision</code></td><td class="typ">int</td><td>CHOP. Pulse <code>1</code> then <code>0</code> on each new caption.</td></tr>
               <tr><td><code>/ai/vision_active</code></td><td class="typ">int</td><td>CHOP. <code>1</code> while the vision model call is in flight.</td></tr>
+              <tr><td><code>/ai/engagement</code></td><td class="typ">string</td><td>DAT. <code>idle</code>, <code>quiz</code>, <code>preach</code>, <code>spectacle</code>.</td></tr>
+              <tr><td><code>/ai/engagement_phase</code></td><td class="typ">string</td><td>DAT. Piece phase (<code>ask</code>, <code>await</code>, <code>hold</code>, …).</td></tr>
+              <tr><td><code>/ai/engagement_card</code></td><td class="typ">string</td><td>DAT. Card id while a piece runs.</td></tr>
+              <tr><td><code>/ai/show</code></td><td class="typ">int</td><td>CHOP. <code>1</code> during a spectacle hold (light cue).</td></tr>
+              <tr><td><code>/ai/show_s</code></td><td class="typ">float</td><td>CHOP. Hold seconds while show is on; else <code>0</code>.</td></tr>
               <tr><td><code>/ai/in_level</code></td><td class="typ">float</td><td>CHOP. Mic peak, 0–1, 30 Hz. Drops to <code>0</code> shortly after the mic closes.</td></tr>
               <tr><td><code>/ai/out_level</code></td><td class="typ">float</td><td>CHOP. Dry-wav peak, 0–1, 30 Hz, clocked from the <code>play</code> edge. Not the post-VST level.</td></tr>
             </tbody>
@@ -524,11 +656,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <tbody>
               <tr><td><code>/ai/in/say</code></td><td class="typ">string</td><td>Visitor line. Skips mic and STT. Runs LLM, TTS, then <code>/ai/play</code>. Appends chat history.</td></tr>
               <tr><td><code>/ai/in/speak</code></td><td class="typ">string</td><td>TTS only. No LLM, no history.</td></tr>
-              <tr><td><code>/ai/in/reset</code></td><td class="typ">int 1</td><td>Clear chat history, empty the transcript fields, and advance to the next goal.</td></tr>
+              <tr><td><code>/ai/in/reset</code></td><td class="typ">int 1</td><td>Clear chat history, end engagement, empty transcripts, advance the next goal.</td></tr>
               <tr><td><code>/ai/in/goal</code></td><td class="typ">int 1</td><td>Skip to the next goal. History stays. <code>0</code> is ignored.</td></tr>
-              <tr><td><code>/ai/in/interrupt</code></td><td class="typ">int 1</td><td>Abort think or speak and return to listening.</td></tr>
+              <tr><td><code>/ai/in/interrupt</code></td><td class="typ">int 1</td><td>Abort think, speak, or engagement and return to listening.</td></tr>
               <tr><td><code>/ai/in/listen</code></td><td class="typ">int</td><td><code>1</code> unmutes the mic, <code>0</code> mutes it.</td></tr>
               <tr><td><code>/ai/in/vision</code></td><td class="typ">int 1</td><td>Grab an NDI still, caption it, speak a reaction. Only when vision is enabled and trigger is <code>external</code>.</td></tr>
+              <tr><td><code>/ai/in/quiz</code></td><td class="typ">int 1</td><td>Fire the next quiz card. <code>0</code> ignored.</td></tr>
+              <tr><td><code>/ai/in/preach</code></td><td class="typ">int 1</td><td>Fire the next preach card. <code>0</code> ignored.</td></tr>
+              <tr><td><code>/ai/in/spectacle</code></td><td class="typ">int 1</td><td>Fire the next spectacle score. <code>0</code> ignored.</td></tr>
             </tbody>
           </table>
         </div>
@@ -540,6 +675,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div id="warmup-bar" class="warmup-bar" hidden>
       <span class="dot"></span>
       <span id="warmup-text">Warming up…</span>
+    </div>
+    <div class="eng-strip" id="eng_strip">
+      <span><strong>Engagement</strong> <span id="eng_strip_mode">idle</span></span>
+      <span>phase <span id="eng_strip_phase">idle</span></span>
+      <span>card <span id="eng_strip_card">—</span></span>
+      <span id="eng_strip_show_wrap">show <span id="eng_strip_show">off</span></span>
+      <span id="eng_strip_await_wrap" hidden>await <span id="eng_strip_await">—</span></span>
     </div>
     <div class="transcript-head">
       <h2>Live Transcript</h2>
@@ -588,13 +730,18 @@ const PATHS = [
   "tts.elevenlabs.model_id","tts.elevenlabs.stability","tts.elevenlabs.similarity_boost",
   "osc.host","osc.port","osc.listen_host","osc.listen_port",
   "vision.ndi_source","vision.trigger","vision.idle_after_s","vision.speak_cooldown_s",
-  "vision.interval_s","vision.change_threshold","vision.max_age_s","vision.model",
+  "vision.interval_s","vision.absent_reset_count","vision.change_threshold","vision.max_age_s","vision.model",
   "vision.jpeg_max_edge","vision.num_predict","vision.num_ctx","vision.num_gpu","vision.num_batch","vision.prompt",
-  "vision.idle_prompt"
+  "vision.idle_prompt",
+  "engagement.await_s"
 ];
 let KOKORO_VOICES = [];
 let PIPER_VOICES = [];
 let PIPER_SPEAKERS = {};
+let engagementDraft = null;
+let floorMode = "quiz";
+let floorCardIndex = 0;
+let engagementDirty = false;
 
 function get(obj, path){ return path.split(".").reduce((o,k)=>o?.[k], obj); }
 function set(obj, path, value){
@@ -926,6 +1073,245 @@ async function fetchElevenLabsVoices(){
   }
 }
 
+function defaultEngagement(){
+  return {
+    await_s: 45,
+    quiz_prompt: "",
+    preach_prompt: "",
+    spectacle_prompt: "",
+    quiz: [],
+    preach: [],
+    spectacle: [],
+  };
+}
+
+function blankCard(mode){
+  if (mode === "quiz") return {id:"", question:"", truth:"", angle:""};
+  if (mode === "preach") return {id:"", title:"", text:""};
+  return {id:"", title:"", beats:[{kind:"hold", seconds:5, text:"", angle:"", fallback:""}]};
+}
+
+function blankBeat(){
+  return {kind:"hold", seconds:5, text:"", angle:"", fallback:""};
+}
+
+function deckList(mode){
+  if (!engagementDraft) return [];
+  return engagementDraft[mode] || [];
+}
+
+function markEngDirty(){ engagementDirty = true; }
+
+function pullCardFieldsIntoDraft(){
+  if (!engagementDraft) return;
+  const list = deckList(floorMode);
+  if (!list.length) return;
+  floorCardIndex = Math.max(0, Math.min(floorCardIndex, list.length - 1));
+  const card = list[floorCardIndex];
+  if (floorMode === "quiz") {
+    card.id = document.getElementById("eng_quiz_id").value.trim();
+    card.question = document.getElementById("eng_quiz_question").value;
+    card.truth = document.getElementById("eng_quiz_truth").value;
+    card.angle = document.getElementById("eng_quiz_angle").value;
+  } else if (floorMode === "preach") {
+    card.id = document.getElementById("eng_preach_id").value.trim();
+    card.title = document.getElementById("eng_preach_title").value;
+    card.text = document.getElementById("eng_preach_text").value;
+  } else {
+    card.id = document.getElementById("eng_spec_id").value.trim();
+    card.title = document.getElementById("eng_spec_title").value;
+    card.beats = collectBeatsFromDom();
+  }
+  const promptKey = floorMode + "_prompt";
+  engagementDraft[promptKey] = document.getElementById("eng_overlay_prompt").value;
+  const awaitEl = document.getElementById("engagement.await_s");
+  if (awaitEl) engagementDraft.await_s = Number(awaitEl.value) || 45;
+}
+
+function collectBeatsFromDom(){
+  const rows = [...document.querySelectorAll("#eng_beats .beat-row")];
+  return rows.map(row => {
+    const kind = row.querySelector(".beat-kind").value || "hold";
+    return {
+      kind,
+      seconds: Number(row.querySelector(".beat-seconds")?.value || 0) || 0,
+      text: row.querySelector(".beat-text")?.value || "",
+      angle: row.querySelector(".beat-angle")?.value || "",
+      fallback: row.querySelector(".beat-fallback")?.value || "",
+    };
+  });
+}
+
+function renderBeats(beats){
+  const host = document.getElementById("eng_beats");
+  host.innerHTML = "";
+  (beats || []).forEach((beat, idx) => {
+    const row = document.createElement("div");
+    row.className = "beat-row";
+    row.dataset.idx = String(idx);
+    const kind = beat.kind || "hold";
+    row.innerHTML = `
+      <select class="beat-kind">
+        <option value="hold">hold</option>
+        <option value="line">line</option>
+        <option value="vision">vision</option>
+      </select>
+      <div class="beat-fields"></div>
+      <button type="button" class="secondary beat-del">×</button>`;
+    row.querySelector(".beat-kind").value = kind;
+    const fields = row.querySelector(".beat-fields");
+    function paintFields(){
+      const k = row.querySelector(".beat-kind").value;
+      if (k === "hold") {
+        fields.innerHTML = `<label style="margin:0">Seconds</label><input class="beat-seconds" type="number" step="0.5" min="0" />`;
+        fields.querySelector(".beat-seconds").value = beat.seconds ?? 5;
+      } else if (k === "line") {
+        fields.innerHTML = `<label style="margin:0">Line</label><textarea class="beat-text" rows="2"></textarea>`;
+        fields.querySelector(".beat-text").value = beat.text || "";
+      } else {
+        fields.innerHTML = `
+          <label style="margin:0">Angle</label><input class="beat-angle" />
+          <label style="margin:0">Fallback</label><input class="beat-fallback" />`;
+        fields.querySelector(".beat-angle").value = beat.angle || "";
+        fields.querySelector(".beat-fallback").value = beat.fallback || "";
+      }
+      fields.querySelectorAll("input,textarea").forEach(el => el.addEventListener("input", markEngDirty));
+    }
+    paintFields();
+    row.querySelector(".beat-kind").onchange = () => { markEngDirty(); paintFields(); };
+    row.querySelector(".beat-del").onclick = () => {
+      markEngDirty();
+      pullCardFieldsIntoDraft();
+      const list = deckList("spectacle");
+      const card = list[floorCardIndex];
+      if (!card) return;
+      card.beats = collectBeatsFromDom().filter((_, i) => i !== idx);
+      renderBeats(card.beats);
+    };
+    host.appendChild(row);
+  });
+}
+
+function pushCardFieldsFromDraft(){
+  if (!engagementDraft) return;
+  document.getElementById("floor-quiz-fields").hidden = floorMode !== "quiz";
+  document.getElementById("floor-preach-fields").hidden = floorMode !== "preach";
+  document.getElementById("floor-spectacle-fields").hidden = floorMode !== "spectacle";
+  const hints = {
+    quiz: "Used for the one roast after they answer. Placeholders: {{question}} {{truth}} {{angle}} {{vision}}",
+    preach: "Used for the one reply after they answer. Placeholders: {{title}} {{hook}} {{vision}}",
+    spectacle: "Used for each vision beat. Placeholders: {{angle}} {{vision}}",
+  };
+  document.getElementById("floor_prompt_hint").textContent = hints[floorMode] || "";
+  document.getElementById("eng_overlay_prompt").value = engagementDraft[floorMode + "_prompt"] || "";
+  const list = deckList(floorMode);
+  if (!list.length) {
+    list.push(blankCard(floorMode));
+    engagementDraft[floorMode] = list;
+  }
+  floorCardIndex = Math.max(0, Math.min(floorCardIndex, list.length - 1));
+  const card = list[floorCardIndex];
+  document.getElementById("eng_card_pos").textContent = `${floorCardIndex + 1} / ${list.length}`;
+  document.getElementById("floor_card_note").textContent = card.id || card.title || `card ${floorCardIndex + 1}`;
+  if (floorMode === "quiz") {
+    document.getElementById("eng_quiz_id").value = card.id || "";
+    document.getElementById("eng_quiz_question").value = card.question || "";
+    document.getElementById("eng_quiz_truth").value = card.truth || "";
+    document.getElementById("eng_quiz_angle").value = card.angle || "";
+  } else if (floorMode === "preach") {
+    document.getElementById("eng_preach_id").value = card.id || "";
+    document.getElementById("eng_preach_title").value = card.title || "";
+    document.getElementById("eng_preach_text").value = card.text || "";
+  } else {
+    document.getElementById("eng_spec_id").value = card.id || "";
+    document.getElementById("eng_spec_title").value = card.title || "";
+    renderBeats(card.beats || []);
+  }
+}
+
+function applyEngagementLive(eng){
+  if (!eng) return;
+  const mode = eng.mode || "idle";
+  const phase = eng.phase || "idle";
+  const card = eng.card_id || "—";
+  const showOn = !!eng.show;
+  const showRem = eng.show_remaining_s;
+  const awaitRem = eng.await_remaining_s;
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setText("eng_mode_live", mode);
+  setText("eng_phase_live", phase);
+  setText("eng_card_live", card);
+  setText("eng_show_live", showOn ? (`1 · ${showRem != null ? showRem + "s" : (eng.show_s || 0) + "s"}`) : "0");
+  setText("eng_await_live", awaitRem != null ? (Math.ceil(awaitRem) + "s") : "—");
+  setText("eng_osc_mode", mode);
+  setText("eng_osc_phase", phase);
+  setText("eng_osc_card", eng.card_id || "");
+  setText("eng_osc_show", showOn ? "1" : "0");
+  setText("eng_osc_show_s", showOn ? String(eng.show_s || 0) : "0");
+  setText("eng_strip_mode", mode);
+  setText("eng_strip_phase", phase);
+  setText("eng_strip_card", card);
+  const showWrap = document.getElementById("eng_strip_show_wrap");
+  if (showWrap) {
+    showWrap.classList.toggle("on-show", showOn);
+    setText("eng_strip_show", showOn ? (`on ${showRem != null ? showRem + "s" : ""}`) : "off");
+  }
+  const awaitWrap = document.getElementById("eng_strip_await_wrap");
+  if (awaitWrap) {
+    awaitWrap.hidden = awaitRem == null;
+    setText("eng_strip_await", awaitRem != null ? (Math.ceil(awaitRem) + "s") : "—");
+  }
+  if (eng.last_rendered_prompt) {
+    setText("eng_rendered_prompt", eng.last_rendered_prompt);
+  }
+  const decks = eng.decks || {};
+  const next = decks[floorMode];
+  if (next) {
+    const preview = next.next_preview || next.next_id || "—";
+    const n = next.count ? `${(next.next_index || 0) + 1} / ${next.count}` : "empty";
+    setText("floor_next_preview", `${n} · ${preview}`);
+    setText("floor_deck_note", n);
+  }
+}
+
+function setFloorMode(mode){
+  if (engagementDraft) pullCardFieldsIntoDraft();
+  floorMode = mode;
+  document.querySelectorAll("[data-floor-mode]").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-floor-mode") === mode);
+  });
+  floorCardIndex = 0;
+  pushCardFieldsFromDraft();
+}
+
+async function saveEngagementIfDirty(){
+  if (!engagementDraft) return;
+  pullCardFieldsIntoDraft();
+  if (!engagementDirty) return;
+  const cfg = await collectConfig();
+  const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
+  if (res.ok) engagementDirty = false;
+  return res.ok;
+}
+
+async function fireEngagement(replay){
+  const ok = await saveEngagementIfDirty();
+  if (ok === false) { setStatus("save failed"); return; }
+  const path = replay
+    ? `/api/engagement/${floorMode}/replay`
+    : `/api/engagement/${floorMode}`;
+  const res = await fetch(path, {method:"POST"});
+  setStatus(res.ok ? (replay ? "replay queued" : "fire queued") : "fire failed");
+}
+
+async function skipEngagement(){
+  await saveEngagementIfDirty();
+  const res = await fetch(`/api/engagement/${floorMode}/skip`, {method:"POST"});
+  const data = await res.json().catch(() => ({}));
+  if (data.engagement) applyEngagementLive(data.engagement);
+  setStatus(res.ok ? "skipped card" : "skip failed");
+}
+
 async function loadConfig(){
   const cfg = await (await fetch("/api/config")).json();
   for (const p of PATHS){
@@ -954,6 +1340,11 @@ async function loadConfig(){
   document.getElementById("vision.enabled").checked = !!v.enabled;
   document.getElementById("vision.inject_context").checked = v.inject_context !== false;
   document.getElementById("vision.store_in_history").checked = !!v.store_in_history;
+  document.getElementById("vision.absent_reset").checked = v.absent_reset !== false;
+  engagementDraft = cfg.engagement ? JSON.parse(JSON.stringify(cfg.engagement)) : defaultEngagement();
+  engagementDirty = false;
+  floorCardIndex = 0;
+  pushCardFieldsFromDraft();
   await loadDevices("input", "audio.input_device_id", cfg.audio.input_device_id);
   await loadDevices("output", "tts.output_device_id", cfg.tts.output_device_id);
   await refreshLlmModels();
@@ -1010,6 +1401,12 @@ async function collectConfig(){
   cfg.vision.enabled = document.getElementById("vision.enabled").checked;
   cfg.vision.inject_context = document.getElementById("vision.inject_context").checked;
   cfg.vision.store_in_history = document.getElementById("vision.store_in_history").checked;
+  cfg.vision.absent_reset = document.getElementById("vision.absent_reset").checked;
+  cfg.vision.absent_reset_count = Math.max(1, Number(document.getElementById("vision.absent_reset_count").value) || 2);
+  if (engagementDraft) {
+    pullCardFieldsIntoDraft();
+    cfg.engagement = JSON.parse(JSON.stringify(engagementDraft));
+  }
   return cfg;
 }
 
@@ -1049,11 +1446,67 @@ document.getElementById("save").onclick = async () => {
   const cfg = await collectConfig();
   const res = await fetch("/api/config", {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg)});
   if (res.ok) {
+    engagementDirty = false;
     document.getElementById("tts.elevenlabs.api_key").value = "";
     document.getElementById("tts.elevenlabs.api_key").placeholder = "•••••••• (blank keeps stored key)";
   }
   setStatus(res.ok ? "saved live" : "save failed");
 };
+document.querySelectorAll("[data-floor-mode]").forEach(btn => {
+  btn.onclick = () => setFloorMode(btn.getAttribute("data-floor-mode"));
+});
+document.getElementById("eng_fire").onclick = () => fireEngagement(false);
+document.getElementById("eng_replay").onclick = () => fireEngagement(true);
+document.getElementById("eng_skip").onclick = () => skipEngagement();
+document.getElementById("eng_card_prev").onclick = () => {
+  pullCardFieldsIntoDraft();
+  floorCardIndex = Math.max(0, floorCardIndex - 1);
+  pushCardFieldsFromDraft();
+};
+document.getElementById("eng_card_next").onclick = () => {
+  pullCardFieldsIntoDraft();
+  const n = deckList(floorMode).length;
+  floorCardIndex = Math.min(n - 1, floorCardIndex + 1);
+  pushCardFieldsFromDraft();
+};
+document.getElementById("eng_card_add").onclick = () => {
+  pullCardFieldsIntoDraft();
+  markEngDirty();
+  const list = deckList(floorMode);
+  list.push(blankCard(floorMode));
+  floorCardIndex = list.length - 1;
+  pushCardFieldsFromDraft();
+};
+document.getElementById("eng_card_del").onclick = () => {
+  pullCardFieldsIntoDraft();
+  markEngDirty();
+  const list = deckList(floorMode);
+  if (list.length <= 1) {
+    engagementDraft[floorMode] = [blankCard(floorMode)];
+    floorCardIndex = 0;
+  } else {
+    list.splice(floorCardIndex, 1);
+    floorCardIndex = Math.min(floorCardIndex, list.length - 1);
+  }
+  pushCardFieldsFromDraft();
+};
+document.getElementById("eng_beat_add").onclick = () => {
+  pullCardFieldsIntoDraft();
+  markEngDirty();
+  const list = deckList("spectacle");
+  const card = list[floorCardIndex];
+  if (!card) return;
+  card.beats = card.beats || [];
+  card.beats.push(blankBeat());
+  renderBeats(card.beats);
+};
+["eng_quiz_id","eng_quiz_question","eng_quiz_truth","eng_quiz_angle",
+ "eng_preach_id","eng_preach_title","eng_preach_text",
+ "eng_spec_id","eng_spec_title","eng_overlay_prompt","engagement.await_s"
+].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", markEngDirty);
+});
 document.getElementById("tts.engine_by_lang.en").onchange = () => {
   fillVoiceSelect("tts.voice_by_lang.en", document.getElementById("tts.engine_by_lang.en").value, document.getElementById("tts.voice_by_lang.en").value);
   syncSpeakerRow("en");
@@ -1250,6 +1703,16 @@ function activityPayload(msg){
   };
 }
 
+function applyAbsence(abs){
+  const el = document.getElementById("absent_streak_live");
+  if (!el || !abs) return;
+  if (!abs.enabled) {
+    el.textContent = "Empty-room reset off.";
+    return;
+  }
+  el.textContent = `Empty in a row: ${abs.streak || 0} / ${abs.count || 2}`;
+}
+
 function connectWs(){
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
@@ -1259,6 +1722,8 @@ function connectWs(){
     if (msg.type === "metrics") {
       applyMetrics(msg);
       if (msg.goal) applyGoal(msg.goal);
+      if (msg.engagement) applyEngagementLive(msg.engagement);
+      if (msg.absence) applyAbsence(msg.absence);
       if ("vision_text" in msg) setVisionResult(msg.vision_text || "");
       if ("mic_on" in msg || "stt" in msg || "thinking" in msg || "synthesizing" in msg || "ai_speaking" in msg
           || "vision_analyzing" in msg) {
@@ -1267,6 +1732,8 @@ function connectWs(){
       return;
     }
     if (msg.goal) applyGoal(msg.goal);
+    if (msg.engagement) applyEngagementLive(msg.engagement);
+    if (msg.absence) applyAbsence(msg.absence);
     if (msg.state) document.getElementById("state").textContent = msg.state;
     if ("user_text" in msg) document.getElementById("user_text").textContent = msg.user_text || "";
     if ("language" in msg) {
@@ -1375,6 +1842,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 "vision_ready": pipeline.vision_ready,
                 "warmup": pipeline.warmup_status(),
                 "goal": pipeline.goal_status(),
+                "engagement": pipeline.engagement_status(),
+                "absence": pipeline.absence_status(),
             }
         )
 
@@ -1422,6 +1891,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                 payload["warmup"] = pipeline.warmup_status()
                 pipeline.tick_goal()
                 payload["goal"] = pipeline.goal_status()
+                payload["engagement"] = pipeline.engagement_status()
+                payload["absence"] = pipeline.absence_status()
                 await hub.broadcast(payload)
                 await asyncio.sleep(0.5)
 
@@ -1568,6 +2039,21 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
         await pipeline.skip_goal("next")
         return {"status": "ok", "goal": pipeline.goal_status()}
 
+    @app.post("/api/engagement/{mode}")
+    async def engagement_fire(mode: Literal["quiz", "preach", "spectacle"]) -> dict[str, Any]:
+        await pipeline.fire_engagement(mode, replay=False)
+        return {"status": "queued", "engagement": pipeline.engagement_status()}
+
+    @app.post("/api/engagement/{mode}/replay")
+    async def engagement_replay(mode: Literal["quiz", "preach", "spectacle"]) -> dict[str, Any]:
+        await pipeline.fire_engagement(mode, replay=True)
+        return {"status": "queued", "engagement": pipeline.engagement_status()}
+
+    @app.post("/api/engagement/{mode}/skip")
+    async def engagement_skip(mode: Literal["quiz", "preach", "spectacle"]) -> dict[str, Any]:
+        status = await pipeline.skip_engagement(mode)
+        return {"status": "ok", "engagement": status}
+
     @app.get("/api/vision/sources")
     async def vision_sources() -> list[str]:
         return await asyncio.to_thread(list_ndi_sources, 5.0)
@@ -1602,6 +2088,8 @@ def create_dashboard(store: ConfigStore, pipeline: Pipeline) -> FastAPI:
                     "vision_ready": pipeline.vision_ready,
                     "warmup": pipeline.warmup_status(),
                     "goal": pipeline.goal_status(),
+                    "engagement": pipeline.engagement_status(),
+                    "absence": pipeline.absence_status(),
                 }
             )
         )
@@ -1664,6 +2152,15 @@ def _make_osc_handler(pipeline: Pipeline):
             # Zeros already filtered in td_server._dispatch
             logger.info("OSC in {} → vision comment", address)
             await pipeline.request_vision_from_osc()
+        elif address == ADDR_QUIZ:
+            logger.info("OSC in {} → quiz", address)
+            await pipeline.fire_engagement("quiz")
+        elif address == ADDR_PREACH:
+            logger.info("OSC in {} → preach", address)
+            await pipeline.fire_engagement("preach")
+        elif address == ADDR_SPECTACLE:
+            logger.info("OSC in {} → spectacle", address)
+            await pipeline.fire_engagement("spectacle")
 
     return _on_command
 

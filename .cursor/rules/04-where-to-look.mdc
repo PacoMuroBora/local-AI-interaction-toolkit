@@ -1,0 +1,32 @@
+---
+description: Where features live in the Luzifer codebase
+alwaysApply: true
+---
+
+# Where to look
+
+Algorithms: `docs/ARCHITECTURE.md`. Dashboard visuals: `docs/DASHBOARD.md`. OSC addresses: `.cursor/rules/02-touchdesigner-osc.mdc` and `docs/OSC_SPEC.md`.
+
+One process (`src/luzifer/main.py`): `Pipeline.run` plus FastAPI on port 8501. Live settings are `ConfigStore` in `config.py`. Schema is `AppSettings`. Persisted copy is `config.yaml`. ElevenLabs key is `runtime/secrets.yaml`.
+
+| Change | File |
+|---|---|
+| Turn order, mic gate, say / speak / vision | `pipeline.py` |
+| Quiz / preach / spectacle decks | `engagement.py` + `pipeline.py` (`_run_engagement_*`) |
+| Deck copy + overlay prompts | `config.yaml` → `engagement`. Read `engagement.venue_note` before rewriting cards. Spoken card text is German. LLM replies default to German and follow the session language. |
+| Empty-room session reset | `vision.absent_reset` + `vision.absent_reset_count`. Local idle captions of `NO_PERSON`. TD still uses `/ai/in/reset`. |
+| Deck cursor (persists) | `runtime/engagement.json` |
+| VAD capture | `audio/vad.py` |
+| Whisper | `stt/whisper.py` |
+| Chat | `llm/ollama.py` (lock shared with `vision/ollama.py`) |
+| `{{current_goal}}` | `goals.py` |
+| `{{vision}}` | `vision/observation.py` |
+| NDI grab / change detect | `vision/ndi.py`, `vision/frames.py` |
+| Kokoro, Piper, wav | `tts/kokoro.py` |
+| ElevenLabs | `tts/elevenlabs.py` |
+| OSC out / in | `osc/td_client.py`, `osc/td_server.py` (inbound dispatch: `dashboard.py` `_make_osc_handler`) |
+| Levels | `metrics.py`, `audio/envelope.py` |
+| Model pull / download | `models.py` |
+| UI, `/api/*`, `/ws` | `dashboard.py` (`DASHBOARD_HTML` + `create_dashboard`) — Floor tab first |
+
+Mic stream runs only while `state == "listening"`. Chat and vision never generate together (`Pipeline._ollama_lock`). Warmup is TTS, then Whisper, then chat, then vision — one GPU load at a time.

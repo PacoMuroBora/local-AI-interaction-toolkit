@@ -17,6 +17,11 @@ ADDR_GOAL = "/ai/in/goal"
 ADDR_INTERRUPT = "/ai/in/interrupt"
 ADDR_LISTEN = "/ai/in/listen"
 ADDR_VISION = "/ai/in/vision"
+ADDR_QUIZ = "/ai/in/quiz"
+ADDR_PREACH = "/ai/in/preach"
+ADDR_SPECTACLE = "/ai/in/spectacle"
+
+_PULSE_ADDRS = (ADDR_VISION, ADDR_GOAL, ADDR_QUIZ, ADDR_PREACH, ADDR_SPECTACLE)
 
 CommandHandler = Callable[[str, Any], Awaitable[None] | None]
 
@@ -35,7 +40,7 @@ class TouchDesignerOscServer:
     def _dispatch(self, address: str, *args: Any) -> None:
         value: Any = args[0] if args else None
         # TD often streams a held 0 every frame — drop before scheduling.
-        if address in (ADDR_VISION, ADDR_GOAL):
+        if address in _PULSE_ADDRS:
             fire = True
             if isinstance(value, (int, float)):
                 fire = bool(int(value))
@@ -75,6 +80,9 @@ class TouchDesignerOscServer:
         dispatcher.map(ADDR_INTERRUPT, self._dispatch)
         dispatcher.map(ADDR_LISTEN, self._dispatch)
         dispatcher.map(ADDR_VISION, self._dispatch)
+        dispatcher.map(ADDR_QUIZ, self._dispatch)
+        dispatcher.map(ADDR_PREACH, self._dispatch)
+        dispatcher.map(ADDR_SPECTACLE, self._dispatch)
         self._server = AsyncIOOSCUDPServer((host, port), dispatcher, self._loop)
         self._transport, _protocol = await self._server.create_serve_endpoint()
         logger.info("OSC inbound listening on {}:{}", host, port)

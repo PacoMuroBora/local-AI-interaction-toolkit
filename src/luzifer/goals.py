@@ -75,6 +75,9 @@ class GoalClock:
     uses: int = 0
     started_at: float = field(default_factory=time.monotonic)
     _timer_on: bool | None = None
+    # Engagement pieces pause the campaign timer without losing remaining_s.
+    _frozen: bool = False
+    _frozen_at: float | None = None
 
     def _parts(self, goals: GoalsSettings) -> tuple[str, list[str]]:
         items = clean_goals(goals.items)
@@ -99,9 +102,33 @@ class GoalClock:
             return ""
         return beats[self.beat]
 
+    def freeze(self, now: float | None = None) -> None:
+        """Pause the campaign timer. Beat hold is not incremented while frozen."""
+        if self._frozen:
+            return
+        now = time.monotonic() if now is None else now
+        self._frozen = True
+        self._frozen_at = now
+
+    def thaw(self, now: float | None = None) -> None:
+        """Resume the campaign timer, shifting ``started_at`` by the freeze duration."""
+        if not self._frozen:
+            return
+        now = time.monotonic() if now is None else now
+        if self._frozen_at is not None:
+            self.started_at += now - self._frozen_at
+        self._frozen = False
+        self._frozen_at = None
+
+    @property
+    def frozen(self) -> bool:
+        return self._frozen
+
     def tick(self, goals: GoalsSettings, now: float | None = None) -> str | None:
         """Advance the campaign on the interval. Returns the new beat, or None if it did not move."""
         now = time.monotonic() if now is None else now
+        if self._frozen:
+            return None
         items = clean_goals(goals.items)
         running = bool(goals.enabled and goals.interval_s > 0 and len(items) > 1)
         if self._timer_on is None:
@@ -145,7 +172,7 @@ class GoalClock:
 
     def advance_beat(self, goals: GoalsSettings) -> str | None:
         """Count a spoken reply. Returns the new beat only when the hold is spent."""
-        if not goals.enabled:
+        if not goals.enabled or self._frozen:
             return None
         _, beats = self._parts(goals)
         if not beats:
@@ -170,7 +197,8 @@ class GoalClock:
         timer_on = bool(goals.enabled and goals.interval_s > 0 and count > 1)
         remaining: float | None = None
         if timer_on:
-            elapsed = max(0.0, now - self.started_at)
+            clock_now = self._frozen_at if self._frozen and self._frozen_at is not None else now
+            elapsed = max(0.0, clock_now - self.started_at)
             remaining = max(0.0, float(goals.interval_s) - elapsed)
         return {
             "enabled": bool(goals.enabled),
@@ -185,4 +213,5 @@ class GoalClock:
             "interval_s": float(goals.interval_s),
             "remaining_s": None if remaining is None else round(remaining, 1),
             "timer_on": timer_on,
+            "frozen": bool(self._frozen),
         }
