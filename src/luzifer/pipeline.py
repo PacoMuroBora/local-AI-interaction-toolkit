@@ -1075,52 +1075,105 @@ class Pipeline:
         await self._notify()
         beats = list(getattr(card, "beats", None) or [])
         settings = await self.store.get()
-        for beat in beats:
-            if self._interrupt.is_set():
-                return
-            kind = str(getattr(beat, "kind", "hold") or "hold").lower()
-            if kind == "hold":
-                seconds = float(getattr(beat, "seconds", 0.0) or 0.0)
-                self.engagement.begin_hold(seconds)
-                await self.set_state("holding")
-                await self._notify()
-                if seconds > 0 and await self._wait_or_interrupt(seconds):
-                    return
-                self.engagement.end_hold()
-                await self._notify()
-                continue
-            if kind == "line":
-                text = str(getattr(beat, "text", "") or "").strip()
-                if not text:
-                    continue
-                self.engagement.set_phase("line")
-                await self._notify()
-                guessed = guess_lang_from_text(text)
-                if guessed:
-                    self._set_turn_language(guessed, source="text")
-                self.last_ai_text = text
-                await self.osc.send_ai_text(text)
-                await self._notify()
-                await self._speak_text(text)
+        spectacle_history = (
+            list(self._history) if settings.llm.history_turns > 0 else []
+        )
+        vision_task: asyncio.Task[str | None] | None = None
+        try:
+            for index, beat in enumerate(beats):
                 if self._interrupt.is_set():
                     return
-                self._append_assistant_history(text)
-                continue
-            if kind == "vision":
-                self.engagement.set_phase("vision")
-                await self._notify()
-                await self._run_spectacle_vision_beat(beat, settings)
-                continue
+                kind = str(getattr(beat, "kind", "hold") or "hold").lower()
+                if kind == "hold":
+                    vision_before_next_hold = False
+                    for future_beat in beats[index + 1 :]:
+                        future_kind = str(
+                            getattr(future_beat, "kind", "") or ""
+                        ).lower()
+                        if future_kind == "hold":
+                            break
+                        if future_kind == "vision":
+                            vision_before_next_hold = True
+                            break
+                    if vision_before_next_hold and settings.vision.enabled:
+                        logger.info(
+                            "Spectacle vision prefetch started with preceding hold"
+                        )
+                        vision_task = asyncio.create_task(
+                            self._caption_frame(settings.vision, force=True),
+                            name="spectacle-vision-prefetch",
+                        )
+                    seconds = float(getattr(beat, "seconds", 0.0) or 0.0)
+                    self.engagement.begin_hold(seconds)
+                    await self.set_state("holding")
+                    await self._notify()
+                    if seconds > 0 and await self._wait_or_interrupt(seconds):
+                        return
+                    self.engagement.end_hold()
+                    await self._notify()
+                    continue
+                if kind == "line":
+                    text = str(getattr(beat, "text", "") or "").strip()
+                    if not text:
+                        continue
+                    self.engagement.set_phase("line")
+                    await self._notify()
+                    guessed = guess_lang_from_text(text)
+                    if guessed:
+                        self._set_turn_language(guessed, source="text")
+                    self.last_ai_text = text
+                    await self.osc.send_ai_text(text)
+                    await self._notify()
+                    await self._speak_text(text)
+                    if self._interrupt.is_set():
+                        return
+                    self._append_assistant_history(text)
+                    continue
+                if kind == "vision":
+                    self.engagement.set_phase("vision")
+                    await self._notify()
+                    if settings.vision.enabled and vision_task is None:
+                        logger.info(
+                            "Spectacle vision has no preceding hold; capturing now"
+                        )
+                        vision_task = asyncio.create_task(
+                            self._caption_frame(settings.vision, force=True),
+                            name="spectacle-vision-capture",
+                        )
+                    caption = ""
+                    if vision_task is not None:
+                        caption = await vision_task or ""
+                        vision_task = None
+                        logger.info("Spectacle vision prefetch ready: {}", bool(caption))
+                    await self._run_spectacle_vision_beat(
+                        beat,
+                        settings,
+                        caption=caption,
+                        history=spectacle_history,
+                    )
+                    continue
+        finally:
+            if vision_task is not None:
+                if not vision_task.done():
+                    vision_task.cancel()
+                try:
+                    await vision_task
+                except asyncio.CancelledError:
+                    pass
         await self._end_engagement(reason="spectacle_done")
         await self.set_state("listening")
         await self._notify()
 
-    async def _run_spectacle_vision_beat(self, beat: Any, settings: Any) -> None:
+    async def _run_spectacle_vision_beat(
+        self,
+        beat: Any,
+        settings: Any,
+        *,
+        caption: str,
+        history: list[ChatMessage],
+    ) -> None:
         angle = str(getattr(beat, "angle", "") or "").strip()
         fallback = str(getattr(beat, "fallback", "") or "").strip()
-        caption = ""
-        if settings.vision.enabled:
-            caption = await self._caption_frame(settings.vision, force=True) or ""
         vision_block = ""
         if caption:
             vision_block = (
@@ -1146,7 +1199,6 @@ class Pipeline:
         )
         await self.set_state("thinking")
         try:
-            history = list(self._history) if settings.llm.history_turns > 0 else []
             ai_text = await self.llm.chat(user, system, settings.llm, history=history)
         except asyncio.CancelledError:
             await self.set_state("listening")
