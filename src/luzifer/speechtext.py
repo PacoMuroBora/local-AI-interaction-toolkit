@@ -88,17 +88,199 @@ _EN_SCALES = (
 )
 
 
+_EN_SMALL = {name: i for i, name in enumerate(_EN_ONES)}
+_EN_SMALL.update(
+    {
+        "twenty": 20,
+        "thirty": 30,
+        "forty": 40,
+        "fifty": 50,
+        "sixty": 60,
+        "seventy": 70,
+        "eighty": 80,
+        "ninety": 90,
+    }
+)
+_EN_SCALE = {
+    "hundred": 100,
+    "thousand": 1_000,
+    "million": 1_000_000,
+    "billion": 1_000_000_000,
+    "trillion": 1_000_000_000_000,
+}
+_EN_SCALE_DE = {
+    1_000_000: ("Million", "Millionen"),
+    1_000_000_000: ("Milliarde", "Milliarden"),
+    1_000_000_000_000: ("Billion", "Billionen"),
+}
+_TOKEN = re.compile(r"\d+(?:[.,]\d+)*|[A-Za-z]+(?:-[A-Za-z]+)?|\s+|.")
+
+
 def numbers_as_words(text: str, lang: str | None) -> str:
-    """Replace digit runs with spoken words. German unless this turn is English."""
+    """Replace digit runs with spoken words. German unless this turn is English.
+
+    A German turn also rewrites English number phrases ("five thousand",
+    "two point seven") so a figure is not spoken in the wrong language.
+    """
     code = (lang or "de").split("-")[0].lower().strip() or "de"
     if code not in {"de", "en"}:
         code = "de"
+    body = text or ""
+    if code == "de":
+        body = _rewrite_english_figures(body)
 
     def repl(match: re.Match[str]) -> str:
         spoken = _token_to_words(match.group(1), code)
         return spoken if spoken else match.group(0)
 
-    return _NUMBER.sub(repl, text or "")
+    return _NUMBER.sub(repl, body)
+
+
+def _en_piece(token: str) -> bool:
+    low = token.lower()
+    if low in {"and", "point", "percent"}:
+        return True
+    if low in _EN_SMALL or low in _EN_SCALE:
+        return True
+    if "-" in low and all(part in _EN_SMALL for part in low.split("-") if part):
+        return True
+    return _NUMBER.fullmatch(token) is not None
+
+
+def _rewrite_english_figures(text: str) -> str:
+    parts = _TOKEN.findall(text)
+    out: list[str] = []
+    i = 0
+    while i < len(parts):
+        if parts[i].isspace() or not _en_piece(parts[i]) or parts[i].lower() in {"and", "point", "percent"}:
+            out.append(parts[i])
+            i += 1
+            continue
+        j = i
+        run: list[str] = []
+        while j < len(parts):
+            piece = parts[j]
+            if piece.isspace():
+                nxt = parts[j + 1] if j + 1 < len(parts) else ""
+                if nxt and _en_piece(nxt):
+                    run.append(piece)
+                    j += 1
+                    continue
+                break
+            if not _en_piece(piece):
+                break
+            run.append(piece)
+            j += 1
+        words = [piece for piece in run if not piece.isspace()]
+        spoken = _english_run_to_german(words) if any(ch.isalpha() for piece in words for ch in piece) else ""
+        if spoken:
+            out.append(spoken)
+            i = j
+            continue
+        out.append(parts[i])
+        i += 1
+    return "".join(out)
+
+
+def _english_run_to_german(words: list[str]) -> str:
+    """Parse one English cardinal, optionally with a decimal and one scale word."""
+    percent = False
+    if words and words[-1].lower() == "percent":
+        percent = True
+        words = words[:-1]
+    if not words:
+        return ""
+    total = 0
+    current = 0
+    frac = ""
+    in_frac = False
+    saw = False
+    named_scale = 0
+    for raw in words:
+        low = raw.lower()
+        if low == "and":
+            continue
+        if low == "point":
+            if in_frac:
+                return ""
+            in_frac = True
+            continue
+        if "-" in low and not any(ch.isdigit() for ch in low):
+            for part in low.split("-"):
+                if part not in _EN_SMALL:
+                    return ""
+                if in_frac:
+                    if _EN_SMALL[part] > 9:
+                        return ""
+                    frac += str(_EN_SMALL[part])
+                else:
+                    current += _EN_SMALL[part]
+            saw = True
+            continue
+        if low in _EN_SCALE:
+            scale = _EN_SCALE[low]
+            if scale == 100:
+                if in_frac:
+                    return ""
+                current = max(current, 1) * 100
+            elif in_frac and frac:
+                if scale not in _EN_SCALE_DE or named_scale or total:
+                    mag = current * scale + int(frac) * scale // (10 ** len(frac))
+                    total += mag
+                    current = 0
+                    frac = ""
+                    in_frac = False
+                else:
+                    named_scale = scale
+            else:
+                total += max(current, 1) * scale
+                current = 0
+            saw = True
+            continue
+        if low in _EN_SMALL:
+            if in_frac:
+                if _EN_SMALL[low] > 9:
+                    return ""
+                frac += str(_EN_SMALL[low])
+            else:
+                current += _EN_SMALL[low]
+            saw = True
+            continue
+        whole, digits = _split_number(raw, "de")
+        if whole is None:
+            return ""
+        if digits:
+            current = whole
+            frac = digits
+            in_frac = True
+        elif in_frac:
+            frac += str(whole)
+        else:
+            current += whole
+        saw = True
+    if not saw:
+        return ""
+    if named_scale and frac:
+        head = _decimal_de(current, frac)
+        one, many = _EN_SCALE_DE[named_scale]
+        label = one if current == 1 and set(frac) <= {"0"} else many
+        spoken = f"{head} {label}"
+    else:
+        total += current
+        if frac and not named_scale:
+            spoken = _decimal_de(int(total), frac)
+        elif total > 10**15:
+            return ""
+        else:
+            spoken = _de_cardinal(int(total))
+    if percent:
+        spoken = f"{spoken} Prozent"
+    return spoken
+
+
+def _decimal_de(whole: int, frac: str) -> str:
+    tail = " ".join(_DE_ONES[int(ch)] for ch in frac if ch.isdigit())
+    return f"{_de_cardinal(whole)} komma {tail}" if tail else _de_cardinal(whole)
 
 
 def _token_to_words(token: str, lang: str) -> str:

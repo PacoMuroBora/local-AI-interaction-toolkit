@@ -1065,8 +1065,8 @@ class Pipeline:
         system = render_engagement_prompt(
             settings.engagement.quiz_ask_prompt,
             {
-                "question": question,
-                "angle": str(getattr(card, "angle", "") or ""),
+                "question": numbers_as_words(question, self.last_language),
+                "angle": numbers_as_words(str(getattr(card, "angle", "") or ""), self.last_language),
                 "vision": vision_block,
             },
         )
@@ -1338,9 +1338,9 @@ class Pipeline:
             system = render_engagement_prompt(
                 settings.engagement.quiz_prompt,
                 {
-                    "question": str(card.question or ""),
-                    "truth": str(card.truth or ""),
-                    "angle": str(card.angle or ""),
+                    "question": numbers_as_words(str(card.question or ""), self.last_language),
+                    "truth": numbers_as_words(str(card.truth or ""), self.last_language),
+                    "angle": numbers_as_words(str(card.angle or ""), self.last_language),
                     "vision": vision_block,
                 },
             )
@@ -1426,9 +1426,9 @@ class Pipeline:
         system = render_engagement_prompt(
             settings.engagement.quiz_hold_prompt,
             {
-                "question": str(card.question or ""),
-                "asked": self.last_ai_text,
-                "angle": str(card.angle or ""),
+                "question": numbers_as_words(str(card.question or ""), self.last_language),
+                "asked": numbers_as_words(self.last_ai_text, self.last_language),
+                "angle": numbers_as_words(str(card.angle or ""), self.last_language),
                 "vision": vision_block,
             },
         )
