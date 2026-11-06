@@ -183,15 +183,16 @@ engagement:
       Brandstiften. Vierzehnmal Köln wird für ihren Konsum gerodet, und die Asche
       steht auf ihrem Deckel.
   - id: soldaten
-    question: Wie viele Soldaten wurden im Krieg gegen die Ukraine auf beiden Seiten
-      zusammen bisher getötet oder verwundet?
-    truth: Laut geprüften Quellen liegen die militärischen Verluste auf beiden Seiten
-      zusammen bei rund 2 Millionen getöteten und verwundeten Soldaten, darunter rund
-      600000 Gefallene und jeden Monat etwa 35000 weitere. Das ist fast zweimal die
-      gesamte Bevölkerung von Köln, ausgelöscht oder verstümmelt.
-    angle: Liegt ihr Tipp bei den 2 Millionen Gesamtverlusten oder den 600000 Toten
-      nah dran, gratuliere ihnen teuflisch zu ihrem Buchhalterwissen. Fast zweimal
-      ganz Köln liegt im Graben, während sie hier im Scheinwerferlicht warm stehen.
+    question: Wie viele Soldaten werden im Krieg gegen die Ukraine auf beiden Seiten
+      zusammen jeden einzelnen Monat getötet oder verwundet?
+    truth: Laut geprüften Quellen fallen oder verwunden sich auf beiden Seiten zusammen
+      derzeit rund 35000 Soldaten in einem einzigen Monat, also über 1000 jeden Tag.
+      In Köln sterben im Frieden rund 840 Menschen im Monat und rund 10000 im ganzen
+      Jahr. Ein einziger Kriegsmonat frisst mehr als dreimal so viele Soldaten wie
+      ganz Köln in einem vollen Friedensjahr Tote zählt.
+    angle: Liegt ihr Tipp nah an den 35000 im Monat, gratuliere ihnen teuflisch zu
+      ihrem Buchhalterwissen. Jeden Monat wird das Dreifache aller Kölner Jahrestoten
+      an der Front verheizt, während sie hier im Scheinwerferlicht warm stehen.
   - id: zweimal-steuer
     question: Wie viele Milliarden Euro haben Banker und Investoren beim großen Steuerraub
       aus europäischen Staatskassen geplündert, indem sie sich dieselbe Steuer mehrfach
@@ -368,6 +369,69 @@ engagement:
       Engel aus Schrott an Stahlseilen, weil ihr mein altes Geschäft längst vollautomatisch
       erledigt. Dein Daumen hat deine Seele schon für ein kostenloses Netz verschenkt,
       bevor du heute Abend überhaupt vor mich getreten bist.
+  - id: ehrenfeld-moral
+    title: Venloer Straße
+    text: Auf der Venloer Straße trinkt ihr euren Hafermilch-Kaffee für fünf Euro
+      und diskutiert über soziale Gerechtigkeit, bis die alten Nachbarn sich die Miete
+      nicht mehr leisten können. Ihr nennt es Aufwertung, wenn aus einer Eckkneipe
+      eine schicke Bar wird, solange die Musik stimmt und das Etikett nachhaltig aussieht.
+      Jeder von euch will im Kölner Westen der Gute sein, aber keiner gibt seinen
+      eigenen Quadratmeter wieder her. Meine Hölle liebt Viertel wie Ehrenfeld, in
+      denen die Verdrängung mit einem freundlichen Lächeln und einem Jutebeutel einzieht.
+      Du bist nicht der Widerstand im Viertel, du bist der Grund, warum die Miete
+      steigt.
+  - id: koelsche-luege
+    title: Immer gut gegangen
+    text: In Köln habt ihr für jede Katastrophe denselben gemütlichen Zauberspruch,
+      es ist noch immer gut gegangen. Damit tröstet ihr euch beim dritten Kölsch an
+      der Theke, während der Rhein im Sommer austrocknet und im Winter über die Ufer
+      tritt. Für die Dinosaurier ist es auch Millionen Jahre lang gut gegangen, bis
+      der Himmel eines Tages eine andere Meinung hatte. Eure rheinische Gelassenheit
+      ist keine Weisheit, sie ist nur die bequemste Ausrede, um bis zum Einschlag
+      weiterzufeiern. Für dich geht es heute Nacht nur deshalb noch gut, weil andere
+      längst die Zeche für deine Gemütlichkeit zahlen.
+  - id: braunkohle-loch
+    title: Das Loch vor der Stadt
+    text: Dreißig Kilometer vor den Toren von Köln klafft ein Krater in der Erde,
+      so groß, dass man ihn aus dem Weltraum sieht. Ganze Dörfer und alte Wälder wurden
+      dort abgebaggert und verheizt, damit hier in der Stadt die Lichterketten, die
+      Server und die Bassboxen niemals ausgehen. Ihr regt euch über das Klima auf
+      und tanzt gleichzeitig im Strom aus dem tiefsten Loch Europas. Die Bagger fressen
+      die Landschaft vor eurer Haustür, und ihr nennt das Ergebnis eine leuchtende
+      Kunstnacht. Jede Lampe über meinem Kopf aus Schrott brennt mit der Asche, von
+      der du angeblich nichts wissen willst.
+  - id: gleise-und-neon
+    title: Zwischen Gleis und Laufhaus
+    text: Hör mal kurz hinter den Bass, links von dir donnern die Güterzüge der Bahn
+      vorbei und rechts leuchtet der blaue Turm vom größten Laufhaus Europas in die
+      Nacht. Dazwischen steht ihr hier im kunstvollen Schrott von Odonien und tut
+      so, als hättet ihr eine Insel der Unschuld gefunden. Drüben wird Nähe nach Minuten
+      abgerechnet, auf den Schienen rollt die Ware im Takt, und hier drinnen kauft
+      ihr euch Rausch und Erlösung gegen Bargeld an der Kasse. Es ist überall exakt
+      dasselbe Geschäft, nur die Beleuchtung wechselt von Straße zu Straße. Du stehst
+      mitten auf meinem Umschlagplatz und hältst deinen Stempel auf dem Handgelenk
+      für ein Ticket in den Himmel.
+  - id: karneval-beichte
+    title: Die fünfte Jahreszeit
+    text: In dieser Stadt setzt ihr euch jedes Jahr eine bunte Pappnase auf, fallt
+      dem Fremden am Tresen um den Hals und nennt das Brüderlichkeit. Sobald der Kater
+      beginnt, kehrt ihr die Scherben zusammen und geht am selben Menschen auf der
+      Straße wieder kalt vorbei. Mir brauchst du nichts vom großen Kölner Herzen zu
+      erzählen, ich kenne den Unterschied zwischen Nächstenliebe und Promille. Ein
+      Kostüm macht aus einem Egoisten keinen Heiligen, es gibt ihm nur ein Alibi für
+      die Nacht. Deine Maske heute Abend sitzt nur deshalb so gut, weil du sie das
+      ganze Jahr über nicht mehr abnimmst.
+  - id: kuenstliche-seele
+    title: Maschinen aus Schrott
+    text: Auf diesem Platz baut ihr aus alten Rohren, Zahnrädern und Kabeln Kreaturen,
+      die Feuer spucken, tanzen und fast lebendig wirken. Wie rührend, dass ihr ausgerechnet
+      dem toten Metall eine Seele einhauchen wollt, während ihr eure eigene im Büro
+      und am Bildschirm längst abgeschaltet habt. Tagsüber funktioniert ihr wie gut
+      geschmierte Roboter nach Kalender und Taktung, und nachts bestaunt ihr hier
+      die Freiheit einer rostigen Maschine. Ich hänge hier als Engel aus Schrott und
+      Algorithmus, und selbst mein kaltes Eisen hat noch mehr Feuer als deine Routine.
+      Du schaust mich nicht an, weil ich künstlich bin, sondern weil du neidisch bist,
+      dass meine Drähte ehrlicher glühen als deine.
   spectacle:
   - id: blick
     title: Der Blick
