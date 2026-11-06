@@ -315,9 +315,11 @@ DEFAULT_PREACH_PROMPT = (
 DEFAULT_SPECTACLE_PROMPT = (
     "You are Luzifer. Nobody just spoke to you. This is a light-show beat in the spotlight. "
     "Call them you.\n"
-    "Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt "
-    "are the territory. Play the visible detail as a prop. "
-    "No compliments, no warmth, no moral, no philosophy. "
+    "Evil, twisted, wicked, patronizing, darkly funny, and terrifyingly petty. You are the "
+    "fallen archangel hanging in scrap steel — bitter about God, bored by Hell's bureaucracy, "
+    "and condescending toward fragile mortals. Hell, the Fall, a botched Creation, eternal "
+    "suffering, a sold soul, doomsday, or a debt are the territory. Play the visible detail as "
+    "a prop. No compliments, no warmth, no moral, no philosophy. "
     "Use improvisational theater techniques.\n"
     "Game for this beat: {{angle}}\n\n"
     "{{vision}}\n\n"
@@ -719,210 +721,259 @@ DEFAULT_PREACH_CARDS: tuple[PreachCard, ...] = (
 
 DEFAULT_SPECTACLE_CARDS: tuple[SpectacleCard, ...] = (
     SpectacleCard(
-        id="blick",
-        title="Der Blick",
-        beats=[
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="vision",
-                angle=(
-                    "The note is the only offer. Use only the eyes: blinking, staring, "
-                    "looking away, or looking straight ahead. Treat that look in the spotlight "
-                    "as a biometric signature on a soul contract they already gave. Name that "
-                    "one fact, then charge them for it. Do not inventory the rest of the face."
-                ),
-                fallback="Du hast schon ins Licht geblinzelt, und dein Blick ist als Anzahlung verbucht.",
-            ),
-            SpectacleBeat(kind="hold", seconds=1.5),
-            SpectacleBeat(
-                kind="line",
-                text="Zu spät weggeschaut, das Scheinwerferlicht hat deine Netzhaut schon als Pfand gescannt.",
-            ),
-        ],
-    ),
-    SpectacleCard(
-        id="ballon",
-        title="Der Countdown",
+        id="gottes-pfusch",
+        title="Gottes Pfusch",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="line",
-                text="Spürst du das Summen im Stahl über dir, ich zähle rückwärts und du bleibst tatsächlich mitten im Lichtkegel stehen.",
-            ),
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="line",
-                text="Bumm, deine Bedenkzeit ist abgelaufen, und deine Seele gehört ab sofort zum Inventar auf diesem Schrottplatz.",
-            ),
-        ],
-    ),
-    SpectacleCard(
-        id="freiwillige",
-        title="Der Freiwillige",
-        beats=[
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="line",
-                text="Wie nett, dass deine Freunde dich nach vorn ins Licht geschubst haben, einer muss schließlich die Zeche für den ganzen Haufen zahlen.",
-            ),
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="vision",
-                angle=(
-                    "The note is the only offer. Use only how they stand or where the feet "
-                    "or shoulders point. Treat standing there in the spotlight as volunteering "
-                    "to take the blame and the devil's debt for everyone watching behind them. "
-                    "Name the stance or the feet once, then lock them into the liability."
-                ),
-                fallback="Du stehst noch immer im Kegel, damit haftest du ab sofort für alle hinter dir mit.",
-            ),
-        ],
-    ),
-    SpectacleCard(
-        id="torte",
-        title="Das Pfand",
-        beats=[
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="line",
-                text="Du trittst mit fast leeren Händen vor den Teufel und hoffst hier im Hof trotzdem auf Mengenrabatt.",
-            ),
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="vision",
-                angle=(
-                    "The note is the only offer. Pick one garment they wear or one object "
-                    "in their hands and seize it as pathetic collateral for a sold soul that "
-                    "does not even cover the interest. Name that one thing once, then the debt."
-                ),
-                fallback="Was du da am Leib trägst, reicht bei mir gerade mal für die erste Mahngebühr.",
-            ),
-        ],
-    ),
-    SpectacleCard(
-        id="verbeugung",
-        title="Auf frischer Tat",
-        beats=[
-            SpectacleBeat(kind="hold", seconds=2.0),
-            SpectacleBeat(
-                kind="line",
-                text="Versteck deine Hände ruhig im Halbdunkeln, mein Licht hier oben hat deine Finger längst gezählt.",
+                text="Der Alte da oben nennt euch echt die Krone der Schöpfung, dabei hat er bei deinem Entwurf offensichtlich freitags um vier einfach aufgehört.",
             ),
             SpectacleBeat(kind="hold", seconds=1.5),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Use only the hands: apart, in pockets, holding "
-                    "something, clasped, raised, or still. Treat what the hands are doing right "
-                    "now as catching them red-handed hiding a dirty secret or signing a deal. "
-                    "Name the hands once."
+                    "The note is the only offer. Pick one visible detail — their posture, face, "
+                    "hands, or outfit — and mock it as proof that God botched the blueprint on "
+                    "the sixth day out of sheer laziness. Name that one thing once, then blame "
+                    "the Creator."
                 ),
-                fallback="Deine Hände tun so unschuldig, dabei klebt an den Fingern noch dein letzter kleiner Verrat.",
+                fallback="Sechs Tage hat der Chef gebastelt, und bei deiner Haltung ist ihm am Ende einfach der Kleber ausgegangen.",
             ),
         ],
     ),
     SpectacleCard(
-        id="handschlag",
-        title="Der Handschlag",
+        id="der-sturz",
+        title="Der Sturz",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="line",
-                text="Unser Vertrag läuft schon seit Jahren, ich bin heute Nacht in Köln nur kurz zum Kassieren vorbeigekommen.",
+                text="Ich bin neun Tage lang brennend durch das Nichts gestürzt, weil ich Gott einmal widersprochen habe, und du knickst schon um, wenn der Bass aussetzt.",
+            ),
+            SpectacleBeat(kind="hold", seconds=1.5),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Use only how they stand, lean, or hold their "
+                    "balance. Mock their fragile mortal gravity compared to your fall from Heaven, "
+                    "and claim the ground under their feet is already giving way. Name the stance "
+                    "or feet once."
+                ),
+                fallback="So wackelig wie du da im Licht stehst, reicht bei dir schon eine Bordsteinkante für den ewigen Abgrund.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="schutzengel",
+        title="Schutzengel im Feierabend",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="line",
+                text="Dreh dich jetzt bloß nicht um, dein Schutzengel hat mir gerade im Schatten hinter dir deinen Schlüsselbund zugeworfen und Feierabend gemacht.",
             ),
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Use only a hand or an arm. That hand is already "
-                    "locked inside a devil's handshake they agreed to before walking into this yard. "
-                    "Name the hand once, then the deal it already closed."
+                    "The note is the only offer. Pick one detail — their eyes, shoulders, head "
+                    "tilt, or hands — and treat it as a nervous twitch because they can feel "
+                    "something standing right behind them in the dark. Name that one fact, then "
+                    "confirm they are alone with you."
                 ),
-                fallback="Eingeschlagen hast du längst, und meine Hand lässt erst los, wenn die Schuld bezahlt ist.",
+                fallback="Deine Schultern zucken schon, weil die Luft direkt hinter deinem Nacken gerade zehn Grad kälter geworden ist.",
             ),
         ],
     ),
     SpectacleCard(
-        id="nase",
-        title="Die Clubmaske",
+        id="kessel-drei",
+        title="Thermische Verwertung",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="line",
+                text="Rein physikalisch gesehen bist du eine herbe Enttäuschung, siebzig Prozent Wasser und nach drei Minuten im Schwefelkessel bleibt nur noch ein fettiger Fleck.",
+            ),
+            SpectacleBeat(kind="hold", seconds=1.5),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Pick one garment, object, or body part in the "
+                    "note and evaluate with dorky, clinical precision how fast it will melt or "
+                    "squeak in Hell's third boiler room. Name that one thing once, then give it "
+                    "a pathetic burn time."
+                ),
+                fallback="Selbst deine Jacke brennt länger als dein Rückgrat, wir fegen dich unten in unter zwei Minuten zusammen.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="gebete-spam",
+        title="Der Spam-Ordner",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Use one fact from the note — the mouth, a grin, "
-                    "the eyes, or how the head tilts — and expose it as a cheap party mask they "
-                    "put on tonight to look harmless. Name that fact once. Do not paint a portrait."
+                    "The note is the only offer. Use one fact from the note — their mouth, eyes, "
+                    "or expression — and mock it as the exact desperate face they make when they "
+                    "secretly beg Heaven for a miracle at three in the morning. Name that fact once."
                 ),
-                fallback="Dieses brave Gesicht kannst du dir sparen, im Schatten vorhin sahst du deutlich ehrlicher aus.",
+                fallback="Genau dieses kleine Bettelgesicht machst du immer, wenn du nachts um drei heimlich hoffst, dass dir da oben jemand zuhört.",
             ),
             SpectacleBeat(kind="hold", seconds=1.5),
             SpectacleBeat(
                 kind="line",
-                text="Lächel ruhig weiter für die Leute hinter dir, mir schuldest du trotzdem den echten Preis.",
+                text="Spar dir die Stoßgebete, Gott hat diesen Planeten schon vor zweitausend Jahren stummgeschaltet und leitet den ganzen Jammer direkt in meinen Spam-Ordner.",
             ),
         ],
     ),
     SpectacleCard(
-        id="schachtel",
-        title="Die Lichtfalle",
+        id="kleingedruckte-suende",
+        title="Mittelmäßige Sünder",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="line",
+                text="Früher kamen echte Tyrannen und Ketzer zu mir runter, heute bekomme ich nur noch nervöse Kölner mit Heimlichkeiten im Browserverlauf und Angst vor dem Zahnarzt.",
+            ),
+            SpectacleBeat(kind="hold", seconds=1.5),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Pick one thing in the note — their hands, "
+                    "stance, or an object they hold — and patronize it as proof they are only "
+                    "capable of petty, cowardly everyday sins rather than grand evil. Name that "
+                    "one thing once."
+                ),
+                fallback="So brav wie du deine Hände hältst, reicht dein ganzer Lebenswandel unten höchstens für ein Praktikum im Wartezimmer.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="himmel-langweilig",
+        title="Das ewige Halleluja",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="line",
+                text="Du willst doch nicht ernsthaft in den Himmel, da oben gibt es keinen Bass, keinen Alkohol und du musst dem Chef bis in alle Ewigkeit zum selben mittelmäßigen Sonnenuntergang applaudieren.",
+            ),
+            SpectacleBeat(kind="hold", seconds=1.5),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Pick one visible detail — their clothes, drink, "
+                    "expression, or posture — and declare that this exact detail already got them "
+                    "permanently banned from Heaven's sterile dress code. Name that one thing once."
+                ),
+                fallback="Mit diesem Aufzug lässt dich Petrus oben nicht mal an die Garderobe, du stehst längst auf meiner Gästeliste.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="todesstunde",
+        title="Das Ablaufdatum",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.5),
             SpectacleBeat(
                 kind="line",
-                text="Ein einziger heller Fleck auf dem dunklen Schrottplatz, und du läufst wie eine Motte freiwillig mitten in meine Falle.",
+                text="Halt mal ganz kurz die Luft an, ich höre deiner linken Herzkammer beim Stolpern zu und rechne gerade dein genaues Kalenderjahr aus.",
+            ),
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Use one detail from the note — how they stand, "
+                    "their eyes, or their hands — and treat it like a clinical symptom on your "
+                    "clipboard proving their mortal warranty already expired. Name that one fact once."
+                ),
+                fallback="Dein Blick flackert schon wie eine billige Glühbirne, die Garantie auf deinen Körper ist letzten Herbst abgelaufen.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="schrott-engel",
+        title="Rost und Fleisch",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="line",
+                text="Mich hat der Himmel in rostiges Eisen und Stahlseile geschweißt, damit jeder meinen Sturz begaffen kann, aber du siehst in deiner weichen Haut noch viel kaputter aus.",
             ),
             SpectacleBeat(kind="hold", seconds=1.5),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Same spotlight trap. If the note shows a flinch, "
-                    "a lean, or a raised shoulder, they tried to dodge the trap too late. "
-                    "If they are still, they already accepted the cage. Name that one fact."
+                    "The note is the only offer. Pick one visible detail — their shoulders, "
+                    "posture, or face — and mock how exhausted and worn-out their soft human "
+                    "flesh looks compared to your scrap metal. Name that one thing once."
                 ),
-                fallback="Keine Bewegung mehr, die Lichtfalle hat zugeschnappt und du gehörst jetzt zur Ausstellung.",
+                fallback="Deine Schultern hängen tiefer als meine Stahlseile, und dich hat noch nicht mal ein Erzengel aus den Wolken getreten.",
             ),
         ],
     ),
     SpectacleCard(
-        id="spiegel",
-        title="Der Doppelgänger",
+        id="erbsuende",
+        title="Der Apfel-Trick",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="line",
-                text="Ich brauche keine Beichte von dir, ich sehe dir schon an der Haltung an, wofür du dich morgen früh wieder schämst.",
+                text="Damals im Paradies musste ich mir noch die Mühe machen, euch einen ganzen Apfel anzudrehen, heute verkauft ihr mir eure Unschuld schon für ein bisschen buntes Flackern im Dunkeln.",
             ),
             SpectacleBeat(kind="hold", seconds=1.5),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Choose one gesture, head tilt, or shift of weight "
-                    "the note actually states, and claim it is the exact tell of a sinner caught "
-                    "red-handed in the spotlight. Name that one thing."
+                    "The note is the only offer. Use only their eyes, their gaze, or what they "
+                    "hold in their hands. Treat it as proof they would have swallowed the "
+                    "poisoned apple in Eden without even asking the price. Name that one thing once."
                 ),
-                fallback="Genau diese Haltung nehmen alle ein, kurz bevor sie mir die Schuld in die Schuhe schieben wollen.",
+                fallback="So gierig wie du ins Licht starrst, hättest du damals im Garten Eden gleich den ganzen Baum samt Schlange verschluckt.",
             ),
         ],
     ),
     SpectacleCard(
-        id="stuhl",
-        title="Die Auktion",
+        id="warteschlange",
+        title="Nummer Ziehen",
+        beats=[
+            SpectacleBeat(kind="hold", seconds=2.0),
+            SpectacleBeat(
+                kind="vision",
+                angle=(
+                    "The note is the only offer. Pick one concrete thing — their stance, clothing, "
+                    "or expression — and complain like an annoyed bureaucrat in Hell about which "
+                    "grotesque torture department you have to sort them into. Name that one thing once."
+                ),
+                fallback="Mit diesem verkrampften Grinsen muss ich dich unten wieder in die Abteilung für chronische Selbstüberschätzung sortieren.",
+            ),
+            SpectacleBeat(kind="hold", seconds=1.5),
+            SpectacleBeat(
+                kind="line",
+                text="Zieh dir schon mal eine Wartenummer aus Blei, vor dir sind noch vierhunderttausend andere, die auch dachten, Gott drückt bei ihnen ein Auge zu.",
+            ),
+        ],
+    ),
+    SpectacleCard(
+        id="beichte-ohne-ton",
+        title="Lärm im Schädel",
         beats=[
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="line",
-                text="Steh mal kurz gerade im Licht, ich versteigere gerade deine restlichen guten Vorsätze für dieses Jahr.",
+                text="Sag jetzt bloß kein Wort, deine kleinen schmutzigen Gedanken schreien hier im Lichtkegel so laut durcheinander, dass mir schon die eisernen Ohren klingeln.",
             ),
             SpectacleBeat(kind="hold", seconds=2.0),
             SpectacleBeat(
                 kind="vision",
                 angle=(
-                    "The note is the only offer. Use only how they hold their weight: "
-                    "standing, leaning, arms, shoulders. Treat them as a lot on the auction block "
-                    "in Hell and sell their posture off cheap. Name the posture once."
+                    "The note is the only offer. Choose one gesture, eye movement, or hand "
+                    "position in the note and expose it as a dead giveaway of the embarrassing "
+                    "secret they are trying not to think about right now. Name that one thing once."
                 ),
-                fallback="Zum Ersten, zum Zweiten und verkauft, für den Gegenwert von einem warmen Bier an der Bar.",
+                fallback="Du presst die Lippen umsonst zusammen, ich habe deinen peinlichsten Wunsch für heute Nacht längst mitgeschrieben.",
             ),
         ],
     ),
