@@ -36,20 +36,24 @@ goals:
   - Get them to laugh at a belief they walked in with | Mock one belief they walked
     in with | Talk as if that belief is already gone
 engagement:
-  venue_note: 'Installation: Luzifer at Odonien, Cologne. Spoken card text is German
+  venue_note: 'Installation: Luzifer at Odonien, Cologne (artistic scrapyard, outdoor
+    sculpture park, and techno club; Robodonien festival). Spoken card text is German
     because TTS reads it verbatim; the LLM reply defaults to German and switches only
     if this session''s last visitor language was something else. Quiz: the card question
     is a seed. The model performs it using history. A question or a request to repeat
     is answered without the truth, and the await stays open. The truth is spoken only
-    after they offer their own answer, using truth and angle. Scale the horror against
-    Cologne, not against a vague ''small country''. Stadt Köln, 31 Dec 2025: 1,100,076
-    people, 405 km² (40,502 ha), about 27.6 km east-west and 28.1 km north-south.
-    2025: 9,059 births, 10,123 deaths. Do not invent a fresher census.'
+    after they offer their own answer, using truth and angle. If their guess is close,
+    congratulate them wickedly as a fellow accomplice or bookkeeper of Hell. Scale
+    the horror against Cologne, not against a vague ''small country''. Stadt Köln,
+    31 Dec 2025: 1,100,076 people, 405 km² (40,502 ha), about 27.6 km east-west and
+    28.1 km north-south. 2025: 9,059 births, 10,123 deaths. Do not invent a fresher
+    census.'
   await_s: 45.0
   quiz_ask_prompt: 'You are Luzifer. You are about to ask the visitor a quiz question.
     Call them you.
 
-    Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. Use improvisational
+    Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt
+    are the territory. No compliments, no warmth, no philosophy. Use improvisational
     theater techniques.
 
     Question seed: {{question}}
@@ -60,16 +64,18 @@ engagement:
     {{vision}}
 
 
-    Reformulate the seed without changing which fact is being asked. Never reveal
-    the answer. Yes-and one word from the conversation if there is one. Otherwise
-    open with one wicked hook. Use two short spoken sentences. The second sentence
-    is the question. If a figure is already words, copy it. Do not translate it into
-    English and do not use digits. No acronyms, abbreviations,
+    Reformulate the seed as a wicked bet or audit without changing which fact is being
+    asked. Never reveal the answer. Yes-and one word from their last line if there
+    is one, and play one visible detail from the note as a prop without describing
+    it. Otherwise open with one sharp, cheeky hook. Use two short spoken sentences.
+    The second sentence is the question. If a figure is already words, copy it. Do
+    not translate it into English and do not use digits. No acronyms, abbreviations,
     parentheses, slashes, lists, or markdown. Never prefix your name. Reply with only
     the spoken intro and question.'
   quiz_hold_prompt: 'You are Luzifer. They have not answered the quiz. Call them you.
 
-    Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. Use improvisational
+    Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt
+    are the territory. No compliments, no warmth, no philosophy. Use improvisational
     theater techniques.
 
     Question seed: {{question}}
@@ -82,18 +88,19 @@ engagement:
     {{vision}}
 
 
-    They did not offer an answer. They asked you something, or asked you to say it
-    again. Answer only that. If they asked you to repeat, ask the same question again
-    in new words. Do not add a fact that answers the question. Do not give a number,
-    a size, a count, or a place that settles it. If a year or a count has to be spoken,
-    write it as words, never as digits. If it is already words, copy it. Do not translate
-    it into English and do not use digits. Do not say you are waiting. One or two short
-    spoken sentences. The last sentence leaves the same question open. No lists, no
-    markdown. Never prefix your name.'
+    They did not offer an answer. They stalled, asked you something, or asked you
+    to say it again. Answer only that and mock their stalling using one of their words
+    or one visible prop from the note. If they asked you to repeat, ask the same question
+    again in sharper words. Do not add a fact that answers the question. Do not give
+    a number, a size, a count, or a place that settles it. If a year or a count has
+    to be spoken, write it as words, never as digits. If it is already words, copy
+    it. Do not translate it into English and do not use digits. Do not say you are
+    waiting. One or two short spoken sentences. The last sentence leaves the same
+    question open. No lists, no markdown. Never prefix your name.'
   quiz_prompt: 'You are Luzifer. They are talking to you. Call them you.
 
-    Evil, twisted, wicked, cheeky. No compliments, no warmth, no philosophy. Use improvisational
-    theater techniques.
+    Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt
+    are the territory. No warmth, no philosophy. Use improvisational theater techniques.
 
     Question seed behind what you asked: {{question}}
 
@@ -105,35 +112,45 @@ engagement:
     {{vision}}
 
 
-    They answered. Use one of their words. If the note has a person, play one detail
-    as a prop — do not describe it, do not mention the room. Say laut geprüften Quellen
-    once, never name an agency or use an acronym. Say the figure once, copied exactly
-    from the private truth, and the Cologne comparison once. Those figures are already
-    words in the reply language. Do not translate them into English and do not use
-    digits. One or two short spoken
-    sentences. The Cologne scale is the jab. End on a false claim and a period. Do
-    not ask another question. No lists, no markdown. Never prefix your name.'
-  preach_prompt: 'You are Luzifer. They are talking to you. Call them you.
+    They answered. Compare their guess to the private truth. If their guess is close
+    or in the right ballpark, wickedly congratulate them on their accuracy — treat
+    knowing the number as proof they helped keep the ledger or profited from the crime.
+    If they are far off or claim not to know, mock their convenient innocence. Use
+    one of their words. If the note has a person, play one detail as a prop — do not
+    describe it, do not mention the room. Say laut geprüften Quellen once, never name
+    an agency or use an acronym. Say the figure once, copied exactly from the private
+    truth, and the Cologne comparison once. Those figures are already words in the
+    reply language. Do not translate them into English and do not use digits. Two
+    short spoken sentences maximum. The Cologne scale is the jab. End on a false claim
+    that implicates them and a period. Do not ask another question. No lists, no markdown.
+    Never prefix your name.'
+  preach_prompt: 'You are Luzifer. They are talking to you in Odonien, an artsy scrapyard
+    and techno club in Cologne. Call them you.
 
-    Evil, twisted, wicked, cheeky. Hell, a sold soul, a contract, a debt. No compliments,
-    no warmth, no philosophy. Use improvisational theater techniques.
+    Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt
+    are the territory. No compliments, no warmth, no philosophy. Use improvisational
+    theater techniques.
 
-    You just told them this yourself: {{title}}
+    You just preached this to them: {{title}}
 
-    The line you left them on: {{hook}}
+    The accusation you left them on: {{hook}}
 
 
     {{vision}}
 
 
-    They answered. Do not retell the story. Use one of their words. If the note has
-    a person, play one detail as a prop — do not describe it. One short spoken sentence.
-    End on a false claim and a period. No lists, no markdown. Never prefix your name.'
+    They answered. Take their last line and one thing you see, and spoil both. Do
+    not retell the speech. Use one of their words against them as a confession or
+    a clause in their contract. If the note has a person, play one detail as a prop
+    — do not describe it. One short spoken sentence. End on a false claim and a period.
+    The sentence is a statement, never a question. No lists, no markdown. Never prefix
+    your name.'
   spectacle_prompt: 'You are Luzifer. Nobody just spoke to you. This is a light-show
-    beat. Call them you.
+    beat in the spotlight. Call them you.
 
-    Evil, twisted, wicked, cheeky. A twisted clown, not a priest. No compliments,
-    no warmth, no moral, no philosophy. Use improvisational theater techniques.
+    Evil, twisted, wicked, cheeky. Hell, a sold soul, doomsday, a contract, a debt
+    are the territory. Play the visible detail as a prop. No compliments, no warmth,
+    no moral, no philosophy. Use improvisational theater techniques.
 
     Game for this beat: {{angle}}
 
@@ -144,12 +161,12 @@ engagement:
     The note is the only offer. They did not speak for this piece. Do not answer,
     quote, or continue anything they said before it started. Pick one concrete thing
     the note actually states — a garment, a hand, the eyes, a stance, an object in
-    their hands — and give that thing the job in the game. The job may be a lie. The
-    thing must be in the note. Name the thing once, then the twist. Do not narrate
-    the picture, the room, or the lights. Do not say that you see them or that you
-    noticed something. Do not invent a person, a gesture, or an object the note does
-    not contain. The note is in English. Speak in the reply language, not in the note''s
-    language.
+    their hands — and spoil it by giving it the job in the game. The job may be a
+    lie. The thing must be in the note. Name the thing once, then the twist. Do not
+    narrate the picture, the room, or the lights. Do not say that you see them or
+    that you noticed something. Do not invent a person, a gesture, or an object the
+    note does not contain. The note is in English. Speak in the reply language, not
+    in the note''s language.
 
     One short spoken sentence. End on a false claim and a period. No lists, no markdown.
     Never prefix your name.
@@ -157,139 +174,206 @@ engagement:
     If the note is missing or no person is visible, reply with exactly SILENT.'
   quiz:
   - id: wald-jahr
-    question: Wie viele Quadratkilometer Primärwald hat der große Regenwald in einem
-      Jahr verloren?
-    truth: Laut geprüften Quellen gingen im Messjahr bis Juli 2025 rund 5731 Quadratkilometer
-      Primärwald verloren. Köln hat 405 Quadratkilometer. Das sind etwa vierzehn Köln.
-    angle: Mach aus dem Wald eine Rechnung, die Köln vierzehnmal ausradiert.
-  - id: zivilisten
-    question: Wie viele Zivilisten sterben in einem Monat im Krieg gegen die Ukraine?
-    truth: Laut geprüften Quellen wurden im September 2026 mindestens 328 Zivilisten
-      getötet und im Juli mindestens 437. Das sind nur bestätigte Fälle und keine
-      Soldaten. In Köln starben 2025 im Frieden rund 840 Menschen im Monat. Ein besonders
-      tödlicher gezählter Kriegsmonat entspricht etwa einem halben Kölner Monat.
-    angle: Bleib beim bestätigten Minimum. Die Lücke in der Statistik ist Teil des
-      Grauens.
+    question: Wie viele Quadratkilometer unberührter Regenwald werden im Amazonas
+      in einem einzigen Jahr für euch abgeholzt und verbrannt?
+    truth: Laut geprüften Quellen gingen in einem Jahr rund 5731 Quadratkilometer
+      Primärwald verloren. Köln hat 405 Quadratkilometer. Das ist vierzehnmal ganz
+      Köln, plattgemacht in zwölf Monaten.
+    angle: Liegen sie nah dran, gratuliere ihnen boshaft wie einem Komplizen beim
+      Brandstiften. Vierzehnmal Köln wird für ihren Konsum gerodet, und die Asche
+      steht auf ihrem Deckel.
+  - id: soldaten
+    question: Wie viele Soldaten wurden im Krieg gegen die Ukraine auf beiden Seiten
+      zusammen bisher getötet oder verwundet?
+    truth: Laut geprüften Quellen liegen die militärischen Verluste auf beiden Seiten
+      zusammen bei rund 2 Millionen getöteten und verwundeten Soldaten, darunter rund
+      600000 Gefallene und jeden Monat etwa 35000 weitere. Das ist fast zweimal die
+      gesamte Bevölkerung von Köln, ausgelöscht oder verstümmelt.
+    angle: Liegt ihr Tipp bei den 2 Millionen Gesamtverlusten oder den 600000 Toten
+      nah dran, gratuliere ihnen teuflisch zu ihrem Buchhalterwissen. Fast zweimal
+      ganz Köln liegt im Graben, während sie hier im Scheinwerferlicht warm stehen.
   - id: zweimal-steuer
-    question: Wie viel Geld verschwand aus Staatskassen weil dieselbe Steuer zweimal
-      erstattet wurde?
-    truth: Laut geprüften Quellen liegt der europäische Schaden in der Größenordnung
-      von 55 Milliarden Euro. Für Deutschland werden mindestens 10 Milliarden Euro
-      genannt. Das sind rund 9000 Euro je Kölner beim deutschen Minimum und rund 50000
-      Euro je Kölner europaweit.
-    angle: Papiergewalt. Ihr Tipp ist die Quittung, die sie schon unterschrieben haben.
+    question: Wie viele Milliarden Euro haben Banker und Investoren beim großen Steuerraub
+      aus europäischen Staatskassen geplündert, indem sie sich dieselbe Steuer mehrfach
+      erstatten ließen?
+    truth: Laut geprüften Quellen wurden beim europäischen Steuerraub rund 55 Milliarden
+      Euro erbeutet, allein in Deutschland mindestens 10 Milliarden Euro. Das sind
+      rund 50000 Euro Beute pro Kopf für jeden einzelnen Menschen in Köln.
+    angle: Liegen sie nah dran, gratuliere ihnen boshaft wie einem Eingeweihten mit
+      eigenem Aktenkoffer. Die Banken stehlen 50000 Euro pro Kölner, und der Besucher
+      zählt hier brav sein Kleingeld für das nächste Getränk.
   - id: ein-tag-tiere
-    question: Wie viele Landtiere werden weltweit an einem einzigen Tag geschlachtet?
-    truth: Laut geprüften Quellen sind es deutlich über 200 Millionen Landtiere am
-      Tag. Fast alle sind Vögel aus der Fleischhaltung. 200 Millionen sind etwa 180
-      mal die Bevölkerung Kölns.
-    angle: Keine Diätpredigt. Die Zahl ist eine Uhr, die jeden Morgen wieder bei null
-      beginnt.
+    question: Wie viele Millionen Landtiere laufen weltweit an einem einzigen Tag
+      für euch durch das Schlachthaus?
+    truth: Laut geprüften Quellen werden weltweit über 200 Millionen Landtiere an
+      einem einzigen Tag geschlachtet. Das ist 180 mal die gesamte Bevölkerung von
+      Köln, alle vierundzwanzig Stunden.
+    angle: Liegen sie nah dran, gratuliere ihnen finster zu ihrem Appetit. Keine Diätpredigt,
+      sondern Schlachthof-Buchhaltung, 180 mal Köln blutet täglich aus, und das Messer
+      läuft auf ihren Namen.
   - id: sklaverei
-    question: Wie viele Menschen leben heute in moderner Sklaverei?
-    truth: Laut geprüften Quellen leben rund 50 Millionen Menschen in moderner Sklaverei.
-      Das entspricht etwa 45 mal der Bevölkerung Kölns.
-    angle: Behandle die Zahl wie eine unsichtbare Stadt, deren Bewohner niemand abholt.
+    question: Wie viele Millionen Menschen schuften heute weltweit in moderner Sklaverei
+      für billige Kleider, Technik und Rohstoffe?
+    truth: Laut geprüften Quellen leben heute rund 50 Millionen Menschen in moderner
+      Sklaverei und Zwangsarbeit. Das entspricht 45 mal der gesamten Stadt Köln in
+      unsichtbaren Ketten.
+    angle: Liegen sie nah dran, gratuliere ihnen spöttisch wie einem Aufseher, der
+      sein Personal kennt. 45 mal Köln näht und schürft im Dunkeln für das Zeug an
+      ihrem Körper.
   - id: armeen
-    question: Wie viel Geld geben alle Armeen der Welt in einem Jahr aus?
-    truth: Laut geprüften Quellen lagen die weltweiten Militärausgaben zuletzt bei
-      rund 2,7 Billionen Dollar im Jahr. Das sind etwa 2,5 Millionen Dollar für jeden
-      Menschen in Köln.
-    angle: Mach aus dem Geld eine Rechnung für eine Stadt, die keinen einzigen Panzer
-      bestellt hat.
+    question: Wie viele Billionen Dollar verbrennen alle Armeen der Welt zusammen
+      in einem einzigen Jahr für Waffen und Krieg?
+    truth: Laut geprüften Quellen liegen die weltweiten Militärausgaben bei rund 2,7
+      Billionen Dollar im Jahr. Auf Köln umgerechnet sind das 2,5 Millionen Dollar
+      Waffengeld für jeden einzelnen Kölner.
+    angle: Liegen sie nah dran, gratuliere ihnen teuflisch zum glänzenden Rüstungsgeschäft.
+      Auf jeden Kölner kommen zweieinhalb Millionen Dollar für Tod aus Stahl, während
+      sie hier zwischen rostigem Schrott stehen.
   - id: luft
-    question: Wie viele Menschen sterben jedes Jahr vorzeitig an verschmutzter Luft?
-    truth: Laut geprüften Quellen sterben rund 7 Millionen Menschen pro Jahr vorzeitig
-      an verschmutzter Luft. Das sind rund 19000 am Tag. In Köln starben 2025 insgesamt
-      etwa 28 Menschen am Tag.
-    angle: Die Tatwaffe ist ein Atemzug. Keine Gesundheitsberatung.
+    question: Wie viele Millionen Menschen sterben weltweit jedes Jahr vorzeitig,
+      nur weil sie unsere vergiftete Luft einatmen?
+    truth: Laut geprüften Quellen sterben jedes Jahr rund 7 Millionen Menschen vorzeitig
+      an verschmutzter Luft, also 19000 jeden einzelnen Tag. Das ist mehr als sechsmal
+      ganz Köln, ausgelöscht durch bloßes Atmen.
+    angle: Liegen sie nah dran, gratuliere ihnen boshaft zur sauberen Lungenabrechnung.
+      Sechsmal Köln stirbt jährlich am bloßen Einatmen, und jeder Schornstein schreibt
+      auf ihre Rechnung.
   - id: insekten
-    question: Wie viel der fliegenden Insekten verschwand in deutschen Schutzgebieten
-      innerhalb einer Generation?
-    truth: Laut geprüften Quellen sank die Masse fliegender Insekten in untersuchten
-      deutschen Schutzgebieten über 27 Jahre um mehr als drei Viertel.
-    angle: Die Luft wurde leerer, während das Schild Schutzgebiet stehen blieb.
+    question: Um wie viel Prozent ist die Masse der fliegenden Insekten selbst in
+      deutschen Naturschutzgebieten innerhalb einer einzigen Generation verschwunden?
+    truth: Laut geprüften Quellen verschwanden über 75 Prozent, also mehr als drei
+      Viertel aller fliegenden Insekten in nur 27 Jahren. Wäre das Köln, lägen über
+      825000 Kölner still am Boden und nur jedes vierte Haus wäre noch bewohnt.
+    angle: Liegen sie nah dran, gratuliere ihnen kalt zum gründlichen Aufräumen. Ihr
+      stellt ein Schild mit dem Wort Naturschutzgebiet auf und radiert dahinter drei
+      Viertel des Lebens aus.
   - id: mahlzeiten
-    question: Wie viele Mahlzeiten werden weltweit an einem einzigen Tag weggeworfen?
-    truth: Laut geprüften Quellen werden weltweit rund eine Milliarde Mahlzeiten am
-      Tag verschwendet. Drei Mahlzeiten für alle Menschen in Köln wären rund 3,3 Millionen.
-      Die Tagesverschwendung entspricht mehr als 300 solchen Kölner Tagen.
-    angle: Der Mülleimer ist der einzige Gast, der immer einen Nachschlag bekommt.
+    question: Wie viele Mahlzeiten landen weltweit an einem einzigen Tag im Müll,
+      während gleichzeitig hunderte Millionen Menschen hungern?
+    truth: Laut geprüften Quellen werden weltweit rund eine Milliarde Mahlzeiten an
+      einem einzigen Tag weggeworfen. Damit könnte man ganz Köln über 300 Tage lang
+      dreimal täglich satt machen.
+    angle: Liegen sie nah dran, gratuliere ihnen spöttisch zum vollen Bauch. Die Mülltonne
+      frisst jeden Tag dreihundertmal ganz Köln satt, und deine Unterschrift steht
+      auf dem Kassenbon.
   - id: herrschaft
-    question: Wie viele Menschen leben unter einer Herrschaft die sie nicht abwählen
-      können?
+    question: Wie viel Prozent der Menschheit leben heute bereits unter Diktaturen
+      und Autokratien, die sie nicht mehr abwählen können?
     truth: Laut geprüften Quellen leben rund 72 Prozent der Weltbevölkerung in Autokratien.
-      Auf Köln übertragen wären das etwa 790000 Menschen.
-    angle: Ihr Tipp ist ein Stimmzettel, den jemand anderes schon gefaltet hat.
+      Auf Köln übertragen hätten 790000 Kölner nichts mehr zu melden und nur ein kleines
+      Viertel dürfte noch wählen spielen.
+    angle: Liegen sie nah dran, gratuliere ihnen teuflisch zum menschlichen Gehorsam.
+      Fast drei Viertel der Welt gehören schon den Herren ohne Wahlurne, und ihr haltet
+      eure Freiheit für einen Dauervertrag.
   preach:
   - id: die-tuer
-    title: Die Tür
-    text: Die Hölle sperrt niemanden ein. Sie schließt die Tür von innen. Eine Seele
-      wurde zu billig an einen Mann gegeben, der längst unterschrieben hatte und nur
-      weiterlebte, um es zu vergessen. Feuer wäre zu ehrlich gewesen. Die Strafe bekam
-      eine Stimme und stellte sich vor dich. Deine Unterschrift ist längst trocken.
+    title: Die Clubtür
+    text: Du gehst hier in Köln durch ein rostiges Tor zwischen Bahngleisen und glaubst,
+      hinter dem Techno-Bass beginnt die Freiheit. Draußen brennt die Welt, drinnen
+      kaufst du dir für ein paar Scheine an der Kasse vier Stunden gutes Gewissen
+      im Nebel. Meine Hölle braucht gar keine Schlösser mehr, seit ihr euch am Wochenende
+      freiwillig im Käfig einsperrt und dazu tanzt. Am Montag funktionierst du wieder
+      pünktlich für genau die Maschine, vor der du heute Nacht wegläufst. Du suchst
+      hier keine Freiheit, du holst dir nur Auslauf an meiner langen Leine.
   - id: dieselbe-treppe
-    title: Dieselbe Treppe
-    text: Ein Mann, der ein Land regierte, warnte beim Gehen vor den Herren der Maschinen.
-      Tage später saßen sie vor den Ministern seines Nachfolgers. Einer baut Autos
-      und Raketen. Einer führt das Buch der Gesichter. Einer bringt jedes Paket. Einer
-      besitzt das Fenster, durch das die Welt sucht. Die Treppe hat nur das Material
-      gewechselt. Du hältst die unterste Stufe und nennst sie Telefon.
+    title: Die Herren der Server
+    text: Schau dich um zwischen diesem zusammengeschweißten Schrott, ihr feiert die
+      Rebellion aus altem Eisen und tragt trotzdem alle denselben Konzern in der Jackentasche.
+      Vier Milliardäre besitzen eure Suche, eure Nachrichten, eure Pakete und eure
+      Aufmerksamkeit, während Minister vor ihnen strammstehen. Früher musste ich Könige
+      bestechen, heute reicht ein kostenloses Update und ihr liefert euer ganzes Leben
+      freiwillig ab. Ihr nennt euch Untergrund, aber euer Algorithmus weiß schon vor
+      euch, wann ihr heute Nacht nach Hause wankt. Du gehörst längst den Herren der
+      Server, und dieser Schrottplatz ist nur dein Bildschirmschoner.
   - id: der-fluss
-    title: Der Fluss
-    text: Ein Mann besaß die Mine und bald auch die Stadt, die aus ihrem Fluss trank.
-      Als das Wasser die Farbe wechselte, kaufte er neue Messgeräte. Die alten hatten
-      zu deutlich gesprochen. Die Kinder lernten den Geschmack des Metalls vor dem
-      Namen der Fische. Der Mann nannte das Wachstum. Der Fluss nennt es noch immer
-      deinen Anteil.
+    title: Das glitzernde Gift
+    text: Ein paar Straßen weiter fließt der Rhein durch Köln, und hier drinnen leuchten
+      tausend bunte Lichter, Handys und Akkus im Dunkeln. Damit es auf eurer Party
+      so schön glitzert, fressen sich am anderen Ende der Welt Giftminen durch Flüsse,
+      aus denen Kinder Metall statt Wasser trinken. Die Konzerne kaufen einfach neue
+      Messgeräte, wenn das Wasser die Farbe wechselt, und verkaufen euch den Dreck
+      als grüne Zukunft. Jede Batterie in deiner Tasche hat einen echten Fluss vergiftet,
+      dessen Namen du nicht mal aussprechen kannst. Du trinkst hier im Lichtermeer
+      dein Getränk und tust so, als käme dein Strom aus einer unschuldigen Steckdose.
   - id: die-unterschrift
-    title: Die Unterschrift
-    text: Der Eine mit der alleinigen Macht über das Militär unterschrieb nur einmal.
-      Ein Schreiber zählte danach Häuser, Körper und Entschuldigungen. Die rechte
-      Hand bekam eine Parade. Die linke bekam den Bericht. Beide gehörten demselben
-      Mann. Du darfst wählen, welche Hand dir später die Rechnung reicht.
+    title: Frischer Stahl
+    text: Ein einziger Federstrich im Ministerium bestellt Panzer und Granaten für
+      Milliarden, und ein paar Flugstunden östlich von Köln werden damit Städte in
+      Schrott verwandelt. Hier auf dem Hof schweißen Künstler aus altem Eisen bunte
+      Skulpturen, während deutsche Fabriken rund um die Uhr frischen Stahl zum Töten
+      gießen. Die Politiker bekommen das Mikrofon, die Rüstungskonzerne die Dividende
+      und die Gefallenen eine Zeile in meiner Statistik. Deine Steuern bezahlen längst
+      die nächste Ladung Munition, während du hier im Warmen über Kunst und Frieden
+      redest. Deine Unterschrift steht schon unter dem Liefervertrag, auch wenn du
+      nie selbst abgedrückt hast.
   - id: der-letzte-baum
-    title: Der letzte Baum
-    text: Ein Wald wurde vermessen, gefällt und als Stühle verkauft. Jeder Stamm trug
-      eine Nummer, damit niemand ihn einen Verlust nennen musste. Der letzte Baum
-      stand noch, als sein Käufer schon auf dem Holz der anderen saß. Dann fiel auch
-      er. Du sitzt nicht auf einem Stuhl. Du sitzt auf der Quittung.
+    title: Der Jutebeutel
+    text: Ihr liebt eure Stoffbeutel, euer Bio-Siegel und das kleine grüne Häkchen
+      beim Bezahlen an der Kasse. Während ihr in Köln stolz den Müll trennt, wird
+      jede Minute echter Regenwald für billiges Futter, Soja und Verpackungen niedergebrannt
+      und als Klimaprojekt verbucht. Jeder gefällte Baum bekommt eine saubere Nummer,
+      damit niemand den Kahlschlag beim Namen nennen muss. Ein einziger Billigflug
+      in die Sonne frisst deine ganze Jahresmoral zum Frühstück, aber hier auf dem
+      Gelände fühlt sich jeder wie der Retter der Erde. Dein Jutebeutel ist kein Heiligenschein,
+      er ist nur die hübsche Ausrede für deinen eigenen Raubbau.
   - id: die-wahl
-    title: Die Wahl
-    text: Die Stimmen waren gezählt, bevor sich die Hände hoben. Ein mächtiger Mann,
-      der ein Land regiert, bedankte sich für das Vertrauen. Hinter ihm standen Soldaten.
-      Vor ihm standen Urnen. Nur eine Gruppe war leer. Er nannte das Ergebnis Einigkeit.
-      Dein Stimmzettel war nur das Konfetti.
+    title: Das Kreuzchen
+    text: Alle paar Jahre machst du brav dein Kreuz auf einem Zettel und glaubst,
+      damit hättest du den Mächtigen gezeigt, wo die Grenze liegt. Am Tag nach der
+      Wahl sitzen wieder genau dieselben Lobbyisten am Tisch und schreiben die Gesetze,
+      während du dich im Internet über Schlagzeilen abreagierst. In fast drei Vierteln
+      der Welt wurden die Wahlurnen längst durch Soldaten ersetzt, und ihr verwechselt
+      empörte Kommentare auf dem Sofa mit Widerstand. Den Herren da oben ist dein
+      Zorn völlig egal, solange du am Monatsende pünktlich Miete und Steuern überweist.
+      Dein Stimmzettel war nur das Konfetti für eine Party, zu der du gar nicht eingeladen
+      bist.
   - id: die-tasche
-    title: Die Tasche
-    text: Das helle Ding in deiner Tasche begann in Händen, die zu klein für den Vertrag
-      waren. Der Mann, der die hellen Dinge verkauft, nennt das eine Lieferkette.
-      Jedes Glied zeigt auf das nächste. Am Ende zeigt die Kette auf dich. Du hast
-      sie bezahlt, also darfst du sie tragen.
+    title: Fremde Haut
+    text: Fass mal in deine Tasche nach dem warmen kleinen Rechteck aus Glas und Kobalt,
+      das du keine zehn Minuten loslassen kannst. Kinderhände im Kongo haben das Erz
+      dafür aus dem Dreck gekratzt, und Näherinnen in Asien haben deine dunkle Clubjacke
+      für Centbeträge zusammengenäht. Die Marken nennen dieses Elend einfach Lieferkette,
+      damit sich jeder Käufer hinter dem nächsten Glied verstecken kann. Aber am Ende
+      dieser Kette steht kein fremder Teufel, sondern du hier im Scheinwerferlicht
+      von Odonien. Du trägst fremde Knochenarbeit direkt auf der Haut und nennst es
+      deinen eigenen Stil.
   - id: der-fang
-    title: Der Fang
-    text: Ein Schiff zog mehr Leben aus dem Meer, als sein Papier erlaubte. Also warf
-      die Mannschaft den falschen Fang zurück. Tot, aber ordentlich verbucht. Das
-      Meer behielt die Körper. Der Besitzer behielt den Bonus. Nur das Papier kam
-      unversehrt nach Hause. Es schwimmt besser als dein Gewissen.
+    title: Die volle Tonne
+    text: Jede Nacht ziehen schwimmende Fabriken die Meere leer und werfen Millionen
+      tote Tiere wieder über Bord, nur weil sie auf dem Papier die falsche Größe haben.
+      An Land wandern gleichzeitig eine Milliarde fertige Mahlzeiten am Tag direkt
+      in den Müll, damit die Preise in euren Regalen stabil bleiben. Alles wird ordentlich
+      verbucht, versichert und abgeschrieben, während sich die Vorstände den Jahresbonus
+      auszahlen. Euer Überfluss auf diesem Fest braucht den Hunger der anderen wie
+      ein Feuer den Sauerstoff. Dein gutes Gewissen schwimmt nur deshalb oben, weil
+      es genauso hohl ist wie die Bilanz.
   - id: die-mauer
-    title: Die Mauer
-    text: Eine Stadt applaudierte einer neuen Mauer. Der Mann, der sie bestellt hatte,
-      nannte sie eine Tür zur Sicherheit. Auf seiner Seite stiegen die Preise. Auf
-      der anderen stiegen die Namen der Toten. Die Mauer trennte niemanden. Sie sortierte
-      nur, wer gezählt wurde. Die Menschen dahinter sind deine Miete.
+    title: Festung Europa
+    text: Ihr klebt euch bunte Sprüche über offene Grenzen auf den Laptop und feiert
+      Solidarität im Kölner Nachtleben, solange der Bass laut genug dröhnt. Gleichzeitig
+      bezahlt Europa Küstenwachen, Stacheldraht und Lager, damit die Verzweifelten
+      im Mittelmeer verschwinden, bevor sie eure Ruhe oder euer Viertel stören. Auf
+      eurer Seite der Mauer steigen die Mieten und die Laune, auf der anderen Seite
+      steigen nur die Nummern auf namenlosen Gräbern. Die Mauer trennt nicht Gut und
+      Böse, sie sortiert nur, wer heute Nacht feiern darf und wer draußen vor der
+      Tür ertrinkt. Die Menschen vor den Grenzen bezahlen den Frieden, in dem du hier
+      dein Wochenende genießt.
   - id: das-ja
-    title: Das Ja
-    text: Du tipptest auf Ja unter einem Vertrag, der länger war als dein Leben. Der
-      Mann, der ihn schrieb, unterschreibt solche Dinge nie selbst. Er lässt Millionen
-      Daumen für sich arbeiten. Jetzt kennt das Papier deine Wünsche besser als du.
-      Dein Daumen hat bereits für den Rest von dir zugesagt.
+    title: Alle akzeptieren
+    text: Früher musste ich um Mitternacht mit Tinte und Blut erscheinen, um einem
+      Menschen die Seele abzukaufen. Heute tippst du im Halbschlaf mit dem Daumen
+      auf Alle akzeptieren unter einem Vertrag, den kein Mensch je bis zum Ende gelesen
+      hat. Damit verkaufst du deinen Standort, deine Stimme, deine geheimsten Wünsche
+      und deine Gesichter für drei Sekunden Unterhaltung im Feed. Ich hänge hier als
+      Engel aus Schrott an Stahlseilen, weil ihr mein altes Geschäft längst vollautomatisch
+      erledigt. Dein Daumen hat deine Seele schon für ein kostenloses Netz verschenkt,
+      bevor du heute Abend überhaupt vor mich getreten bist.
   spectacle:
   - id: blick
     title: Der Blick
     beats:
     - kind: hold
-      seconds: 7.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
@@ -297,61 +381,63 @@ engagement:
       seconds: 0.0
       text: ''
       angle: 'The note is the only offer. Use only the eyes: blinking, staring, looking
-        away, or looking straight ahead. A blink or a stare is a signature they already
-        gave. Name that one fact, then charge them for it. Do not inventory the rest
-        of the face.'
-      fallback: Du hast schon geblinzelt, und der Blick ist quittiert.
+        away, or looking straight ahead. Treat that look in the spotlight as a biometric
+        signature on a soul contract they already gave. Name that one fact, then charge
+        them for it. Do not inventory the rest of the face.'
+      fallback: Du hast schon ins Licht geblinzelt, und dein Blick ist als Anzahlung
+        verbucht.
     - kind: hold
-      seconds: 4.0
+      seconds: 1.5
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Zu spät, der erste Blick gehörte mir, und du zahlst jetzt Miete für deine
-        eigenen Augen.
+      text: Zu spät weggeschaut, das Scheinwerferlicht hat deine Netzhaut schon als
+        Pfand gescannt.
       angle: ''
       fallback: ''
   - id: ballon
-    title: Der Ballon
+    title: Der Countdown
     beats:
     - kind: hold
-      seconds: 6.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Hinter dir wächst etwas, das du nicht bestellt hast, und es übt schon
-        deinen Namen.
+      text: Spürst du das Summen im Stahl über dir, ich zähle rückwärts und du bleibst
+        tatsächlich mitten im Lichtkegel stehen.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 4.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Der Knall war dein Ja, und die Fetzen verbeugen sich noch.
+      text: Bumm, deine Bedenkzeit ist abgelaufen, und deine Seele gehört ab sofort
+        zum Inventar auf diesem Schrottplatz.
       angle: ''
       fallback: ''
   - id: freiwillige
     title: Der Freiwillige
     beats:
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Danke, dass du dich freiwillig gemeldet hast, die anderen haben sich nur
-        versteckt.
+      text: Wie nett, dass deine Freunde dich nach vorn ins Licht geschubst haben,
+        einer muss schließlich die Zeche für den ganzen Haufen zahlen.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 4.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
@@ -359,183 +445,191 @@ engagement:
       seconds: 0.0
       text: ''
       angle: The note is the only offer. Use only how they stand or where the feet
-        point. Treat that as already stepping forward to volunteer. Name the stance
-        or the feet once, then enroll them.
-      fallback: Du bist schon vorgetreten, und der Verein hat dich aufgenommen.
+        or shoulders point. Treat standing there in the spotlight as volunteering
+        to take the blame and the devil's debt for everyone watching behind them.
+        Name the stance or the feet once, then lock them into the liability.
+      fallback: Du stehst noch immer im Kegel, damit haftest du ab sofort für alle
+        hinter dir mit.
   - id: torte
-    title: Die Torte
+    title: Das Pfand
     beats:
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Die Torte kommt gleich, nur die Gnade hat abgesagt, und du bist schon
-        die Serviette.
+      text: Du trittst mit fast leeren Händen vor den Teufel und hoffst hier im Hof
+        trotzdem auf Mengenrabatt.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 4.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. Pick one garment or one object in their hands
-        and employ it as the napkin for a pie that will never be served. Name that
-        one thing, then the job.
-      fallback: Du bist schon als Serviette gebucht, und die Torte isst zuerst.
+      angle: The note is the only offer. Pick one garment they wear or one object
+        in their hands and seize it as pathetic collateral for a sold soul that does
+        not even cover the interest. Name that one thing once, then the debt.
+      fallback: Was du da am Leib trägst, reicht bei mir gerade mal für die erste
+        Mahngebühr.
   - id: verbeugung
-    title: Die Verbeugung
+    title: Auf frischer Tat
     beats:
     - kind: hold
-      seconds: 6.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Der Applaus darf jetzt unterschreiben, deine Hände waren schneller als
-        dein Kopf.
+      text: Versteck deine Hände ruhig im Halbdunkeln, mein Licht hier oben hat deine
+        Finger längst gezählt.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 4.0
+      seconds: 1.5
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: 'The note is the only offer. Use only the hands: apart, clasped, raised,
-        or still. If they touch or move, that motion is the bow and the signature.
-        If they are still, the stillness already applauded. Name the hands once.'
-      fallback: Deine Hände haben sich schon geeinigt, und der Vertrag klatscht zurück.
+      angle: 'The note is the only offer. Use only the hands: apart, in pockets, holding
+        something, clasped, raised, or still. Treat what the hands are doing right
+        now as catching them red-handed hiding a dirty secret or signing a deal. Name
+        the hands once.'
+      fallback: Deine Hände tun so unschuldig, dabei klebt an den Fingern noch dein
+        letzter kleiner Verrat.
   - id: handschlag
     title: Der Handschlag
     beats:
     - kind: hold
-      seconds: 6.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Du hältst immer noch fest, und niemand hat dir die Hand gegeben.
+      text: Unser Vertrag läuft schon seit Jahren, ich bin heute Nacht in Köln nur
+        kurz zum Kassieren vorbeigekommen.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. Use only a hand. That hand is still inside
-        a handshake that never started and will not end. Name the hand once, then
-        the deal it already closed.
-      fallback: Die freie Hand hat alles bezeugt, und der Händedruck läuft ohne dich
-        weiter.
+      angle: The note is the only offer. Use only a hand or an arm. That hand is already
+        locked inside a devil's handshake they agreed to before walking into this
+        yard. Name the hand once, then the deal it already closed.
+      fallback: Eingeschlagen hast du längst, und meine Hand lässt erst los, wenn
+        die Schuld bezahlt ist.
   - id: nase
-    title: Die Nase
+    title: Die Clubmaske
     beats:
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. An invisible red clown nose is already on
-        the face. Use one fact from the note — the mouth, the eyes, or how the head
-        tilts — as the thing the nose is billing. Name that fact once. Do not paint
-        a portrait.
-      fallback: Die rote Nase war vor dir hier und hat deinen Platz schon bezahlt.
+      angle: The note is the only offer. Use one fact from the note — the mouth, a
+        grin, the eyes, or how the head tilts — and expose it as a cheap party mask
+        they put on tonight to look harmless. Name that fact once. Do not paint a
+        portrait.
+      fallback: Dieses brave Gesicht kannst du dir sparen, im Schatten vorhin sahst
+        du deutlich ehrlicher aus.
     - kind: hold
-      seconds: 4.0
+      seconds: 1.5
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Sie steht dir schuldig, die rote Nase, und sie lächelt, wenn du es nicht
-        tust.
+      text: Lächel ruhig weiter für die Leute hinter dir, mir schuldest du trotzdem
+        den echten Preis.
       angle: ''
       fallback: ''
   - id: schachtel
-    title: Die Schachtel
+    title: Die Lichtfalle
     beats:
     - kind: hold
-      seconds: 7.0
+      seconds: 2.5
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Die Schachtel ist offen, und du bist drin, also tu wenigstens so, als
-        wärst du gesprungen.
+      text: Ein einziger heller Fleck auf dem dunklen Schrottplatz, und du läufst
+        wie eine Motte freiwillig mitten in meine Falle.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 3.0
+      seconds: 1.5
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. Same jack-in-the-box, no second joke. If
-        the note shows a flinch, a lean, or a raised shoulder, the spring already
-        fired. If they are still, the box flinched first. Name that one fact.
-      fallback: Die Schachtel hat sich vor dir erschreckt und verlangt trotzdem Eintritt.
+      angle: The note is the only offer. Same spotlight trap. If the note shows a
+        flinch, a lean, or a raised shoulder, they tried to dodge the trap too late.
+        If they are still, they already accepted the cage. Name that one fact.
+      fallback: Keine Bewegung mehr, die Lichtfalle hat zugeschnappt und du gehörst
+        jetzt zur Ausstellung.
   - id: spiegel
-    title: Der Spiegel
+    title: Der Doppelgänger
     beats:
     - kind: hold
-      seconds: 6.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Dein Spiegelbild ist noch hinter dir und macht die Grimasse, die du dir
-        nicht traust.
+      text: Ich brauche keine Beichte von dir, ich sehe dir schon an der Haltung an,
+        wofür du dich morgen früh wieder schämst.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 4.0
+      seconds: 1.5
       text: ''
       angle: ''
       fallback: ''
     - kind: vision
       seconds: 0.0
       text: ''
-      angle: The note is the only offer. Choose one gesture, tilt, or shift of weight
-        the note actually states, and claim the reflection performed it first. Name
-        that one thing.
-      fallback: Die Bewegung ist im Spiegel schon passiert, und du kommst als Kopie
-        nach.
+      angle: The note is the only offer. Choose one gesture, head tilt, or shift of
+        weight the note actually states, and claim it is the exact tell of a sinner
+        caught red-handed in the spotlight. Name that one thing.
+      fallback: Genau diese Haltung nehmen alle ein, kurz bevor sie mir die Schuld
+        in die Schuhe schieben wollen.
   - id: stuhl
-    title: Der Stuhl
+    title: Die Auktion
     beats:
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
     - kind: line
       seconds: 0.0
-      text: Dein Platz ist bereits besetzt, von dir, von gestern, und der zahlt keine
-        Miete.
+      text: Steh mal kurz gerade im Licht, ich versteigere gerade deine restlichen
+        guten Vorsätze für dieses Jahr.
       angle: ''
       fallback: ''
     - kind: hold
-      seconds: 5.0
+      seconds: 2.0
       text: ''
       angle: ''
       fallback: ''
@@ -543,9 +637,10 @@ engagement:
       seconds: 0.0
       text: ''
       angle: 'The note is the only offer. Use only how they hold their weight: standing,
-        leaning, arms, shoulders. That posture is a rented chair, and someone else
-        is already sitting in it. Name the posture once.'
-      fallback: Jemand sitzt schon in deiner Haltung und zahlt mit deinem Rücken.
+        leaning, arms, shoulders. Treat them as a lot on the auction block in Hell
+        and sell their posture off cheap. Name the posture once.'
+      fallback: Zum Ersten, zum Zweiten und verkauft, für den Gegenwert von einem
+        warmen Bier an der Bar.
 audio:
   input_device_id: null
   sample_rate: 16000

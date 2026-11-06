@@ -326,6 +326,10 @@ def _split_number(token: str, lang: str) -> tuple[int | None, str]:
         if not whole.isdigit() or not frac.isdigit():
             return None, ""
         return int(whole), frac
+    if "," in token and "." not in token:
+        whole, frac = token.split(",", 1)
+        if len(frac) != 3 and whole.isdigit() and frac.isdigit():
+            return int(whole), frac
     digits = token.replace(",", "")
     return (int(digits), "") if digits.isdigit() else (None, "")
 
